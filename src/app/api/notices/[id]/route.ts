@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -7,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { title, content, image, file } = body;
 
     const prisma = await getTenantPrisma();

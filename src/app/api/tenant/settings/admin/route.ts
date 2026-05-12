@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -6,7 +6,7 @@ import * as jose from "jose";
 
 export async function PUT(request: NextRequest) {
   try {
-    const rawData = await request.json();
+    const rawData = (await request.json()) as any;
     const { username, password } = rawData;
 
     if (!username || !password) {

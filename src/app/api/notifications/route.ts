@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
@@ -151,7 +151,7 @@ export async function PATCH(request: Request) {
 
     const targetEmployeeId = isAdminRequest ? null : employeeId;
 
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { id, all } = body;
     const prisma = await getTenantPrisma();
     

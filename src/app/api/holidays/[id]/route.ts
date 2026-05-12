@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { holidaySchema } from "@/app/api/_helpers";
@@ -5,7 +6,7 @@ import { holidaySchema } from "@/app/api/_helpers";
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const parsed = holidaySchema.parse(await request.json());
+    const parsed = holidaySchema.parse((await request.json()) as any);
 
     const holiday = await (await getTenantPrisma()).holiday.update({
       where: { id },

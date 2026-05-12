@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { format } from "date-fns";
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "API Key is required" }, { status: 401 });
     }
 
-    const { logs } = await request.json();
+    const { logs } = (await request.json()) as any;
     if (!Array.isArray(logs)) {
       return NextResponse.json({ message: "Logs must be an array" }, { status: 400 });
     }

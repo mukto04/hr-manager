@@ -1,11 +1,11 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
     const prisma = await getTenantPrisma();
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { title, content, image, file } = body;
 
     const notice = await prisma.notice.create({

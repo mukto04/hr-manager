@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as jose from "jose";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   const auth = await getAuthContext();
   if (!auth) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const { action, password, pin, newPin } = await request.json();
+  const { action, password, pin, newPin } = (await request.json()) as any;
 
   // â”€â”€â”€ SETUP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (action === "setup") {

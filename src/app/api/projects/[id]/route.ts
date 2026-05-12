@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notify";
@@ -48,7 +49,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const data = await request.json();
+    const data = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     // Fetch old project to compare status and members

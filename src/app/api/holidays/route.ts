@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { holidaySchema } from "@/app/api/_helpers";
@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const parsed = holidaySchema.parse(await request.json());
+    const parsed = holidaySchema.parse((await request.json()) as any);
 
     const holiday = await (await getTenantPrisma()).holiday.create({
       data: {

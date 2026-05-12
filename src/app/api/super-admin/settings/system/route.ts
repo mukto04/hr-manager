@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { loginTitle, loginSub, country, currencySymbol, timezone, language } = await request.json();
+    const { loginTitle, loginSub, country, currencySymbol, timezone, language } = (await request.json()) as any;
 
     const adminConfig = await masterPrisma.masterAdmin.findFirst();
 

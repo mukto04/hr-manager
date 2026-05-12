@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -7,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
-    const { isPaid, isHeld } = await request.json();
+    const { isPaid, isHeld } = (await request.json()) as any;
 
     const dataToUpdate: any = {};
     if (isPaid !== undefined) dataToUpdate.isPaid = isPaid;

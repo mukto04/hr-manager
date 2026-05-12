@@ -1,10 +1,10 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { password } = await request.json();
+    const { password } = (await request.json()) as any;
 
     // Fetch dynamic password from DB
     const adminConfig = await masterPrisma.masterAdmin.findFirst();

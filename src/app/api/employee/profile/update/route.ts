@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/employee-auth";
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { image } = await request.json();
+    const { image } = (await request.json()) as any;
 
     if (!image) {
       return NextResponse.json({ message: "Image data is required" }, { status: 400 });

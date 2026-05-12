@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notify";
@@ -8,7 +9,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
-    const { status, hrNote } = await request.json();
+    const { status, hrNote } = (await request.json()) as any;
 
     if (!id) return NextResponse.json({ message: "ID is required" }, { status: 400 });
 

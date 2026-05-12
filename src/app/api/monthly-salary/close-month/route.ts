@@ -1,11 +1,11 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateSalaryBreakdown } from "@/utils/calculations";
 
 export async function POST(request: NextRequest) {
   try {
-    const { month, year } = await request.json();
+    const { month, year } = (await request.json()) as any;
 
     if (!month || !year) {
       return NextResponse.json({ message: "month and year are required" }, { status: 400 });

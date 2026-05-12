@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { monthlySalarySchema, toMonthlySalaryPayload } from "@/app/api/_helpers";
@@ -6,7 +7,7 @@ import { createNotification } from "@/lib/notify";
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const parsed = monthlySalarySchema.parse(await request.json());
+    const parsed = monthlySalarySchema.parse((await request.json()) as any);
 
     // Fetch previous state to know if it was just marked as paid
     const prisma = await getTenantPrisma();

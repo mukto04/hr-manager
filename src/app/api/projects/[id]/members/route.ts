@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notify";
@@ -8,7 +9,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { employeeId, role } = await request.json();
+    const { employeeId, role } = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     if (!employeeId) {

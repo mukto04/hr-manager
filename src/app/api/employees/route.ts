@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma, masterPrisma, getTenantSlug } from "@/lib/prisma";
 import { employeeSchema } from "@/app/api/_helpers";
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const rawData = await request.json();
+    const rawData = (await request.json()) as any;
     const parsed = employeeSchema.parse(rawData);
 
     const tenantPrisma = await getTenantPrisma();

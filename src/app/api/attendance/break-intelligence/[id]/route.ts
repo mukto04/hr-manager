@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -7,7 +8,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { startTime, endTime, note } = body;
 
     const start = new Date(startTime);

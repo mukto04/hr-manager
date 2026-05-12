@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
+    const data = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     // Prevent duplicate serial numbers
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const data = await request.json();
+    const data = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     const device = await prisma.attendanceDevice.update({

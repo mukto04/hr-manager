@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { monthlySalarySchema, toMonthlySalaryPayload } from "@/app/api/_helpers";
@@ -168,7 +168,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const parsed = monthlySalarySchema.parse(await request.json());
+    const parsed = monthlySalarySchema.parse((await request.json()) as any);
 
     const prisma = await getTenantPrisma();
     const settings = await prisma.tenantSettings.findFirst();

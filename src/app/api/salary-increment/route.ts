@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateSalaryBreakdown } from "@/utils/calculations";
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const prisma = await getTenantPrisma();
-    const data = await request.json();
+    const data = (await request.json()) as any;
     const { employeeIds, type, value, month, year, note } = data;
 
     if (!employeeIds || employeeIds.length === 0) {

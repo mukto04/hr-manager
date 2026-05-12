@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest) {
       employeeFieldsConfig,
       customFields,
       autoLeaveDeduction
-    } = await request.json();
+    } = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     if (!defaultInTime || !defaultOutTime || !avgRequestTime) {

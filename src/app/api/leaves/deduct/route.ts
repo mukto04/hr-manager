@@ -1,11 +1,11 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notify";
 
 export async function POST(request: NextRequest) {
   try {
-    const { employeeId, fromDate, toDate, note, amount } = await request.json();
+    const { employeeId, fromDate, toDate, note, amount } = (await request.json()) as any;
 
     if (!employeeId || !fromDate || !amount) {
       return NextResponse.json({ message: "Employee, Date and Amount are required" }, { status: 400 });

@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateAttendanceStatus, syncLeaveBalanceForAttendance } from "@/lib/attendance-utils";
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { employeeId, date, checkIn, checkOut, status, isManual, note } = body;
 
     if (!employeeId || !date) {

@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -37,7 +38,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const data = await request.json();
+    const data = (await request.json()) as any;
     const prisma = await getTenantPrisma();
 
     const log = await prisma.projectWorkLog.create({

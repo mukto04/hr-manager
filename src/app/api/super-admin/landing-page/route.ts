@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { section, content } = await request.json();
+    const { section, content } = (await request.json()) as any;
 
     if (!section || !content) {
       return NextResponse.json({ message: "Section and content are required" }, { status: 400 });

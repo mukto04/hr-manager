@@ -1,10 +1,10 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { currentPassword, newPassword } = await request.json();
+    const { currentPassword, newPassword } = (await request.json()) as any;
 
     if (!currentPassword || !newPassword) {
       return NextResponse.json({ message: "Missing required fields" }, { status: 400 });

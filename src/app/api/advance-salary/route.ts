@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { advanceSalarySchema } from "@/app/api/_helpers";
@@ -18,7 +18,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const parsed = advanceSalarySchema.parse(await request.json());
+    const parsed = advanceSalarySchema.parse((await request.json()) as any);
 
     // Check expected payable salary
     const salary = await (await getTenantPrisma()).salaryStructure.findUnique({ where: { employeeId: parsed.employeeId } });

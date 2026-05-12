@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -6,7 +6,7 @@ import { calculateProRataLeave } from "@/utils/leave-calculator";
 
 export async function POST(request: NextRequest) {
   try {
-    const { year, defaultAmount, overwrite = false } = await request.json();
+    const { year, defaultAmount, overwrite = false } = (await request.json()) as any;
 
     if (!year || defaultAmount === undefined) {
       return NextResponse.json({ message: "Year and defaultAmount are required" }, { status: 400 });

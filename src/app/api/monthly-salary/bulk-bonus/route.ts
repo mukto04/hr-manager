@@ -1,10 +1,10 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { month, year, percentage } = await request.json();
+    const { month, year, percentage } = (await request.json()) as any;
 
     if (!month || !year || percentage === undefined) {
       return NextResponse.json({ message: "Missing month, year or percentage" }, { status: 400 });

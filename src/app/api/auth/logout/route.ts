@@ -1,9 +1,9 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = (await request.json()) as any.catch(() => ({}));
     const slug = body?.slug as string | undefined;
 
     // Redirect to branded company login if slug available, else generic /login

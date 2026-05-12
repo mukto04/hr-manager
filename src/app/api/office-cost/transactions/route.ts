@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { costTransactionSchema } from "../../_helpers";
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const prisma = await getTenantPrisma();
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const parsed = costTransactionSchema.parse(body);
 
     const date = new Date(parsed.date);
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const prisma = await getTenantPrisma();
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { id, ...data } = body;
 
     if (!id) {

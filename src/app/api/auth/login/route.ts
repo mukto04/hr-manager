@@ -9,7 +9,7 @@ const SESSION_SECRET = "appdevs-hr-portal-secure-vault-998877";
 
 export async function POST(request: NextRequest) {
   try {
-    const { slug, username, password } = await request.json();
+    const { slug, username, password } = (await request.json()) as any;
 
     if (!slug || !username || !password) {
       return NextResponse.json({ message: "Company identifier, username and password are required." }, { status: 400 });

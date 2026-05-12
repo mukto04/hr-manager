@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { slug, companyName, dbUrl, adminUsername, adminPassword, subscriptionDays, planName, employeeLimit } = body;
 
     if (!slug || !companyName || !dbUrl || !adminUsername || !adminPassword) {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as any;
     console.log("Super Admin PUT Request Body:", JSON.stringify(body, null, 2));
     const { id, subscriptionDays, ...data } = body;
 

@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { employeeSchema } from "@/app/api/_helpers";
@@ -6,7 +7,7 @@ import { calculateSalaryBreakdown } from "@/utils/calculations";
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const rawData = await request.json();
+    const rawData = (await request.json()) as any;
     const parsed = employeeSchema.parse(rawData);
 
     // Filter out `salary` and `status` from schema-parsed data

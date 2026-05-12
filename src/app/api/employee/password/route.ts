@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextResponse, NextRequest } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";

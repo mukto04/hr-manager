@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 import { PrismaClient } from "@prisma/client";
@@ -9,7 +9,7 @@ const COOKIE_NAME = "employee_session";
 export async function POST(request: NextRequest) {
   let tenantClient: PrismaClient | null = null;
   try {
-    const { slug, employeeCode, password } = await request.json();
+    const { slug, employeeCode, password } = (await request.json()) as any;
 
     if (!slug || !employeeCode || !password) {
       return NextResponse.json({ message: "Login URL, employee code and password are required." }, { status: 400 });

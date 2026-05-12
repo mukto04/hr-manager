@@ -1,4 +1,4 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "API Key is required" }, { status: 401 });
     }
 
-    const { machineStatus, error } = await request.json();
+    const { machineStatus, error } = (await request.json()) as any;
 
     let tenantSlug = request.headers.get("x-tenant-slug");
     if (tenantSlug && tenantSlug.endsWith("-hr")) {
