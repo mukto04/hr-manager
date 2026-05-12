@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { leaveBalances, leaveRecords } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET() {
@@ -10,28 +12,29 @@ export async function GET() {
   }
 
   try {
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     // Get the latest leave balance
-    const leaveBalances = await prisma.leaveBalance.findMany({
-      where: { employeeId },
-      orderBy: { year: "desc" },
-      take: 1
-    });
+    const empLeaveBalances = await db
+      .select()
+      .from(leaveBalances)
+      .where(eq(leaveBalances.employeeId, employeeId))
+      .orderBy(desc(leaveBalances.year))
+      .limit(1);
 
     // Get all leave records
-    const leaveRecords = await prisma.leaveRecord.findMany({
-      where: { employeeId },
-      orderBy: { date: "desc" }
-    });
+    const empLeaveRecords = await db
+      .select()
+      .from(leaveRecords)
+      .where(eq(leaveRecords.employeeId, employeeId))
+      .orderBy(desc(leaveRecords.date));
 
     return NextResponse.json({
-      leaveBalance: leaveBalances[0] || null,
-      leaveRecords: leaveRecords || []
+      leaveBalance: empLeaveBalances[0] || null,
+      leaveRecords: empLeaveRecords || []
     });
   } catch (error) {
     console.error("Leaves API error:", error);
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

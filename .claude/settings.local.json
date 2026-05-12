@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-Content \"package.json\")",
+      "Bash(Select-String -Pattern '\"\\(date-fns|lucide-react|zod|jspdf|pdfkit|html2canvas|recharts|@hookform|react-hook-form\\)\"')",
+      "Bash(xargs grep -l \"export const runtime.*=.*[\\\\\"']edge[\\\\\"']\")",
+      "Bash(git checkout *)",
+      "Bash(npm install *)"
+    ]
+  }
+}

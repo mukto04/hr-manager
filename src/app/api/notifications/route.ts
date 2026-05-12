@@ -1,12 +1,14 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, getDb, newId, now } from "@/lib/db";
+import { notifications, notes, tenants } from "@/lib/db/schema";
+import { eq, and, lt, lte, isNull, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET(request: Request) {
   try {
     const employeeId = await getEmployeeIdFromSession();
-    
+
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
     const isHrAdmin = !!cookieStore.get("hr_auth_token")?.value;
@@ -18,7 +20,7 @@ export async function GET(request: Request) {
     if (isAdminRequest && !isHrAdmin) {
       return NextResponse.json({ message: "Unauthorized Admin" }, { status: 401 });
     }
-    
+
     // If it's an employee request, check employee session
     if (!isAdminRequest && !employeeId) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -26,33 +28,36 @@ export async function GET(request: Request) {
 
     const targetEmployeeId = isAdminRequest ? null : employeeId;
 
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     // 1. Check for due Note Reminders and convert to Notifications
-    const now = new Date();
-    const dueNotes = await prisma.note.findMany({
-      where: {
-        reminderAt: { lte: now },
-        isReminderNotified: false
-      }
-    });
+    const nowDate = new Date();
+    const nowStr = nowDate.toISOString();
+
+    const dueNotes = await db
+      .select()
+      .from(notes)
+      .where(and(lte(notes.reminderAt, nowStr), eq(notes.isReminderNotified, false)));
 
     if (dueNotes.length > 0) {
       console.log(`[Notifications API] Found ${dueNotes.length} due notes.`);
       for (const note of dueNotes) {
         try {
-          await prisma.notification.create({
-            data: {
-              employeeId: null, // HR level notification
-              title: "Note Reminder",
-              message: note.title ? `Reminder: ${note.title}` : `Reminder: ${note.content.replace(/<[^>]*>?/gm, '').substring(0, 50)}...`,
-              type: "REMINDER"
-            }
+          await db.insert(notifications).values({
+            id: newId(),
+            employeeId: null, // HR level notification
+            title: "Note Reminder",
+            message: note.title
+              ? `Reminder: ${note.title}`
+              : `Reminder: ${note.content.replace(/<[^>]*>?/gm, "").substring(0, 50)}...`,
+            type: "REMINDER",
+            createdAt: now(),
+            updatedAt: now()
           });
-          await prisma.note.update({
-            where: { id: note.id },
-            data: { isReminderNotified: true }
-          });
+          await db
+            .update(notes)
+            .set({ isReminderNotified: true, updatedAt: now() })
+            .where(eq(notes.id, note.id));
           console.log(`[Notifications API] Created reminder for note: ${note.id}`);
         } catch (err) {
           console.error(`[Notifications API] Failed to create notification for note ${note.id}:`, err);
@@ -63,29 +68,43 @@ export async function GET(request: Request) {
     // Auto-cleanup: Delete notifications older than 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    await prisma.notification.deleteMany({
-      where: {
-        employeeId: targetEmployeeId,
-        createdAt: { lt: sevenDaysAgo }
-      }
-    });
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString();
 
-    const notifications = await prisma.notification.findMany({
-      where: { employeeId: targetEmployeeId },
-      orderBy: { createdAt: "desc" },
-      take: 50
-    });
+    if (targetEmployeeId === null) {
+      await db
+        .delete(notifications)
+        .where(and(isNull(notifications.employeeId), lt(notifications.createdAt, sevenDaysAgoStr)));
+    } else {
+      await db
+        .delete(notifications)
+        .where(
+          and(eq(notifications.employeeId, targetEmployeeId), lt(notifications.createdAt, sevenDaysAgoStr))
+        );
+    }
+
+    const notificationList = targetEmployeeId === null
+      ? await db
+          .select()
+          .from(notifications)
+          .where(isNull(notifications.employeeId))
+          .orderBy(desc(notifications.createdAt))
+          .limit(50)
+      : await db
+          .select()
+          .from(notifications)
+          .where(eq(notifications.employeeId, targetEmployeeId))
+          .orderBy(desc(notifications.createdAt))
+          .limit(50);
 
     // --- Subscription & Admin Info Fetch ---
     let subscription = null;
     try {
-      const { cookies } = await import("next/headers");
+      const { cookies: getCookies } = await import("next/headers");
       const jose = await import("jose");
-      const { masterPrisma } = await import("@/lib/prisma");
-      
-      const cookieStore = await cookies();
-      const token = cookieStore.get("hr_auth_token")?.value;
-      
+
+      const cStore = await getCookies();
+      const token = cStore.get("hr_auth_token")?.value;
+
       if (token) {
         const secret = new TextEncoder().encode(
           process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877"
@@ -94,18 +113,21 @@ export async function GET(request: Request) {
         const slug = payload.slug as string;
 
         if (slug) {
-          const tenant = await masterPrisma.tenant.findUnique({
-            where: { slug },
-            select: { 
-              subscriptionEnd: true, 
-              adminUsername: true, 
-              adminPassword: true 
-            }
-          });
+          const tenant = await getDb()
+            .select({
+              subscriptionEnd: tenants.subscriptionEnd,
+              adminUsername: tenants.adminUsername,
+              adminPassword: tenants.adminPassword
+            })
+            .from(tenants)
+            .where(eq(tenants.slug, slug.toLowerCase()))
+            .get();
 
           if (tenant) {
             const endDate = tenant.subscriptionEnd ? new Date(tenant.subscriptionEnd) : null;
-            const daysLeft = endDate ? Math.ceil((endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+            const daysLeft = endDate
+              ? Math.ceil((endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+              : 0;
 
             subscription = {
               daysLeft,
@@ -121,7 +143,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      notifications,
+      notifications: notificationList,
       subscription
     });
   } catch (error: any) {
@@ -133,7 +155,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const employeeId = await getEmployeeIdFromSession();
-    
+
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
     const isHrAdmin = !!cookieStore.get("hr_auth_token")?.value;
@@ -144,7 +166,7 @@ export async function PATCH(request: Request) {
     if (isAdminRequest && !isHrAdmin) {
       return NextResponse.json({ message: "Unauthorized Admin" }, { status: 401 });
     }
-    
+
     if (!isAdminRequest && !employeeId) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
@@ -153,26 +175,35 @@ export async function PATCH(request: Request) {
 
     const body = (await request.json()) as any;
     const { id, all } = body;
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     if (all) {
-      await prisma.notification.updateMany({
-        where: { employeeId: targetEmployeeId, isRead: false },
-        data: { isRead: true }
-      });
+      if (targetEmployeeId === null) {
+        await db
+          .update(notifications)
+          .set({ isRead: true, updatedAt: now() })
+          .where(and(isNull(notifications.employeeId), eq(notifications.isRead, false)));
+      } else {
+        await db
+          .update(notifications)
+          .set({ isRead: true, updatedAt: now() })
+          .where(
+            and(eq(notifications.employeeId, targetEmployeeId), eq(notifications.isRead, false))
+          );
+      }
     } else if (id) {
       if (isAdminRequest) {
         // HR admin: mark by ID only (no employeeId filter, HR notifs have null employeeId)
-        await prisma.notification.update({
-          where: { id },
-          data: { isRead: true }
-        });
+        await db
+          .update(notifications)
+          .set({ isRead: true, updatedAt: now() })
+          .where(eq(notifications.id, id));
       } else {
         // Employee: mark by ID + employeeId for security
-        await prisma.notification.update({
-          where: { id, employeeId: targetEmployeeId },
-          data: { isRead: true }
-        });
+        await db
+          .update(notifications)
+          .set({ isRead: true, updatedAt: now() })
+          .where(and(eq(notifications.id, id), eq(notifications.employeeId, targetEmployeeId!)));
       }
     }
 
@@ -182,4 +213,3 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to update notification" }, { status: 500 });
   }
 }
-

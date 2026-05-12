@@ -2,7 +2,9 @@ export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as jose from "jose";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -27,10 +29,14 @@ export async function GET() {
 
     if (slug) {
       try {
-        const tenant = await masterPrisma.tenant.findUnique({
-          where: { slug: slug.toLowerCase() },
-          select: { permissions: true, planName: true },
-        });
+        const tenant = await getDb()
+          .select({
+            permissions: tenants.permissions,
+            planName: tenants.planName
+          })
+          .from(tenants)
+          .where(eq(tenants.slug, slug.toLowerCase()))
+          .get();
         if (tenant) {
           livePermissions = tenant.permissions ?? payload.permissions;
           planName = tenant.planName ?? payload.planName;
@@ -52,4 +58,3 @@ export async function GET() {
     return NextResponse.json({ message: "Invalid session" }, { status: 401 });
   }
 }
-

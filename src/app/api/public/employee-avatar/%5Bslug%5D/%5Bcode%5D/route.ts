@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getPrismaBySlug } from "@/lib/prisma";
+import { getDbBySlug } from "@/lib/db";
+import { employees } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -13,15 +15,16 @@ export async function GET(
       return NextResponse.json({ message: "Invalid parameters" }, { status: 400 });
     }
 
-    const prisma = await getPrismaBySlug(slug);
-    
-    const employee = await prisma.employee.findUnique({
-      where: { employeeCode: code },
-      select: {
-        name: true,
-        image: true
-      }
-    });
+    const db = await getDbBySlug(slug);
+
+    const employee = await db
+      .select({
+        name: employees.name,
+        image: employees.image
+      })
+      .from(employees)
+      .where(eq(employees.employeeCode, code))
+      .get();
 
     if (!employee) {
       return NextResponse.json({ message: "Employee not found" }, { status: 404 });
@@ -33,4 +36,3 @@ export async function GET(
     return NextResponse.json({ message: "Connection failed" }, { status: 500 });
   }
 }
-

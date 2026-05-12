@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb, now } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import * as jose from "jose";
 
@@ -24,7 +26,7 @@ export async function PUT(request: NextRequest) {
     const secret = new TextEncoder().encode(
       process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877"
     );
-    
+
     const { payload } = await jose.jwtVerify(token, secret);
     const slug = payload.slug as string;
 
@@ -33,13 +35,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // 2. Update Master Tenant Recording
-    await masterPrisma.tenant.update({
-      where: { slug },
-      data: {
+    await getDb()
+      .update(tenants)
+      .set({
         adminUsername: username,
         adminPassword: password
-      }
-    });
+      })
+      .where(eq(tenants.slug, slug));
 
     return NextResponse.json({ message: "Credentials updated successfully" });
   } catch (error: any) {
@@ -50,4 +52,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-

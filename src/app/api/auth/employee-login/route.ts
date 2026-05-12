@@ -1,13 +1,13 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
-import { PrismaClient } from "@prisma/client";
+import { getDb, getDbBySlug } from "@/lib/db";
+import { tenants, employees } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import * as jose from "jose";
 
 const COOKIE_NAME = "employee_session";
 
 export async function POST(request: NextRequest) {
-  let tenantClient: PrismaClient | null = null;
   try {
     const { slug, employeeCode, password } = (await request.json()) as any;
 
@@ -16,9 +16,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Resolve Tenant from Master DB
-    const tenant = await masterPrisma.tenant.findUnique({
-      where: { slug: slug.toLowerCase() }
-    });
+    const tenant = await getDb()
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, slug.toLowerCase()))
+      .get();
 
     if (!tenant) {
       return NextResponse.json({ message: "Invalid Login URL or Company." }, { status: 404 });
@@ -29,13 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Connect to Tenant DB and Verify Employee
-    tenantClient = new PrismaClient({
-      datasources: { db: { url: tenant.dbUrl } }
-    });
+    const tenantDb = await getDbBySlug(slug.toLowerCase());
 
-    const employee = await tenantClient.employee.findUnique({
-      where: { employeeCode }
-    });
+    const employee = await tenantDb
+      .select()
+      .from(employees)
+      .where(eq(employees.employeeCode, employeeCode))
+      .get();
 
     if (!employee || employee.status !== "ACTIVE" || employee.password !== password) {
       return NextResponse.json({ message: "Invalid Employee Code or Password." }, { status: 401 });
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Create Session JWT (aligned with Multi-Tenant Routing)
     const secret = new TextEncoder().encode(process.env.SESSION_SECRET || "fallback-secret");
-    
+
     const token = await new jose.SignJWT({
       employeeId: employee.id,
       slug: tenant.slug,
@@ -70,8 +72,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Employee login error:", error);
     return NextResponse.json({ message: "Login failed due to an internal error." }, { status: 500 });
-  } finally {
-    if (tenantClient) await tenantClient.$disconnect();
   }
 }
-

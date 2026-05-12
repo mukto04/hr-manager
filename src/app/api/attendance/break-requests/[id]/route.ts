@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { breakRequests, breakRecords } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { createNotification } from "@/lib/notify";
 
 export async function PATCH(
@@ -13,12 +15,14 @@ export async function PATCH(
 
     if (!id) return NextResponse.json({ message: "ID is required" }, { status: 400 });
 
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     // Fetch the break request first to get employeeId
-    const breakReq = await prisma.breakRequest.findUnique({
-      where: { id },
-    });
+    const breakReq = await db
+      .select()
+      .from(breakRequests)
+      .where(eq(breakRequests.id, id))
+      .get();
 
     if (!breakReq) return NextResponse.json({ message: "Request not found" }, { status: 404 });
 
@@ -29,27 +33,27 @@ export async function PATCH(
         (new Date(breakReq.endTime).getTime() - new Date(breakReq.startTime).getTime()) / 60000
       );
 
-      await prisma.$transaction([
-        prisma.breakRequest.update({
-          where: { id },
-          data: { status: "APPROVED", hrNote }
-        }),
-        prisma.breakRecord.create({
-          data: {
-            employeeId: breakReq.employeeId,
-            date: breakReq.date,
-            startTime: breakReq.startTime,
-            endTime: breakReq.endTime,
-            duration,
-            note: breakReq.reason
-          }
-        })
-      ]);
-    } else {
-      await prisma.breakRequest.update({
-        where: { id },
-        data: { status, hrNote }
+      await db
+        .update(breakRequests)
+        .set({ status: "APPROVED", hrNote: hrNote || null, updatedAt: now() })
+        .where(eq(breakRequests.id, id));
+
+      await db.insert(breakRecords).values({
+        id: newId(),
+        employeeId: breakReq.employeeId,
+        date: breakReq.date,
+        startTime: breakReq.startTime,
+        endTime: breakReq.endTime,
+        duration,
+        note: breakReq.reason,
+        createdAt: now(),
+        updatedAt: now(),
       });
+    } else {
+      await db
+        .update(breakRequests)
+        .set({ status, hrNote: hrNote || null, updatedAt: now() })
+        .where(eq(breakRequests.id, id));
     }
 
     // Notify Employee

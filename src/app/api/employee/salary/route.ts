@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { salaryStructures, monthlySalaries } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET() {
@@ -10,22 +12,24 @@ export async function GET() {
   }
 
   try {
-    const salaryStructure = await (await getTenantPrisma()).salaryStructure.findUnique({
-      where: { employeeId }
-    });
+    const db = await getTenantDb();
 
-    const monthlySalaries = await (await getTenantPrisma()).monthlySalary.findMany({
-      where: { employeeId },
-      orderBy: [
-        { year: "desc" },
-        { month: "desc" }
-      ]
-    });
+    const [salaryStructure, empMonthlySalaries] = await Promise.all([
+      db
+        .select()
+        .from(salaryStructures)
+        .where(eq(salaryStructures.employeeId, employeeId))
+        .get(),
+      db
+        .select()
+        .from(monthlySalaries)
+        .where(eq(monthlySalaries.employeeId, employeeId))
+        .orderBy(desc(monthlySalaries.year), desc(monthlySalaries.month))
+    ]);
 
-    return NextResponse.json({ salaryStructure, monthlySalaries });
+    return NextResponse.json({ salaryStructure: salaryStructure || null, monthlySalaries: empMonthlySalaries });
   } catch (error) {
     console.error("Salary API error:", error);
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

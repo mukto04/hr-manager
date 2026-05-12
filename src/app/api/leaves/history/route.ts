@@ -1,6 +1,9 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { leaveRecords, leaveBalances } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -12,14 +15,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const prisma = await getTenantPrisma();
-    const records = await prisma.leaveRecord.findMany({
-      where: {
-        employeeId,
-        year: parseInt(year)
-      },
-      orderBy: { date: "desc" }
-    });
+    const db = await getTenantDb();
+    const records = await db
+      .select()
+      .from(leaveRecords)
+      .where(and(eq(leaveRecords.employeeId, employeeId), eq(leaveRecords.year, parseInt(year))))
+      .orderBy(desc(leaveRecords.date));
 
     return NextResponse.json(records);
   } catch (error) {
@@ -36,36 +37,42 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     // Find the record to know how much to refund
-    const record = await prisma.leaveRecord.findUnique({ where: { id } });
+    const record = await db
+      .select()
+      .from(leaveRecords)
+      .where(eq(leaveRecords.id, id))
+      .limit(1)
+      .get();
+
     if (!record) return NextResponse.json({ message: "Record not found" }, { status: 404 });
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Delete record
-      await tx.leaveRecord.delete({ where: { id } });
+    // 1. Delete record
+    await db.delete(leaveRecords).where(eq(leaveRecords.id, id));
 
-      // 2. Refund balance
-      const balance = await tx.leaveBalance.findUnique({
-        where: { employeeId_year: { employeeId: record.employeeId, year: record.year } }
-      });
+    // 2. Refund balance
+    const balance = await db
+      .select()
+      .from(leaveBalances)
+      .where(and(eq(leaveBalances.employeeId, record.employeeId), eq(leaveBalances.year, record.year)))
+      .limit(1)
+      .get();
 
-      if (balance) {
-        await tx.leaveBalance.update({
-          where: { id: balance.id },
-          data: {
-            dueLeave: {
-              increment: record.type === "DEDUCTION" ? record.amount : -record.amount
-            }
-          }
-        });
-      }
-    });
+    if (balance) {
+      const refundAmount = record.type === "DEDUCTION" ? record.amount : -record.amount;
+      await db
+        .update(leaveBalances)
+        .set({
+          dueLeave: sql`${leaveBalances.dueLeave} + ${refundAmount}`,
+          updatedAt: now()
+        })
+        .where(eq(leaveBalances.id, balance.id));
+    }
 
     return NextResponse.json({ message: "Leave record deleted and balance refunded" });
   } catch (error) {
     return NextResponse.json({ message: "Failed to delete leave record" }, { status: 500 });
   }
 }
-

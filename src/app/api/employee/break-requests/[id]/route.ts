@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { breakRequests } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function PATCH(
@@ -16,12 +18,14 @@ export async function PATCH(
     const { id } = await context.params;
     const { date, startTime, endTime, reason } = (await request.json()) as any;
 
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     // Check if request exists and is still PENDING
-    const existingRequest = await prisma.breakRequest.findUnique({
-      where: { id, employeeId }
-    });
+    const existingRequest = await db
+      .select()
+      .from(breakRequests)
+      .where(and(eq(breakRequests.id, id), eq(breakRequests.employeeId, employeeId)))
+      .get();
 
     if (!existingRequest) {
       return NextResponse.json({ message: "Request not found" }, { status: 404 });
@@ -31,15 +35,18 @@ export async function PATCH(
       return NextResponse.json({ message: "Only pending requests can be edited" }, { status: 400 });
     }
 
-    const updatedRequest = await prisma.breakRequest.update({
-      where: { id },
-      data: {
-        date: new Date(date),
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        reason
-      }
-    });
+    const updatedRequest = await db
+      .update(breakRequests)
+      .set({
+        date: new Date(date).toISOString(),
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+        reason,
+        updatedAt: now()
+      })
+      .where(eq(breakRequests.id, id))
+      .returning()
+      .get();
 
     return NextResponse.json(updatedRequest);
   } catch (error: any) {
@@ -59,19 +66,19 @@ export async function DELETE(
 
   try {
     const { id } = await context.params;
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
-    const existingRequest = await prisma.breakRequest.findUnique({
-      where: { id, employeeId }
-    });
+    const existingRequest = await db
+      .select()
+      .from(breakRequests)
+      .where(and(eq(breakRequests.id, id), eq(breakRequests.employeeId, employeeId)))
+      .get();
 
     if (!existingRequest || existingRequest.status !== "PENDING") {
       return NextResponse.json({ message: "Cannot delete this request" }, { status: 400 });
     }
 
-    await prisma.breakRequest.delete({
-      where: { id }
-    });
+    await db.delete(breakRequests).where(eq(breakRequests.id, id));
 
     return NextResponse.json({ message: "Deleted successfully" });
   } catch (error: any) {

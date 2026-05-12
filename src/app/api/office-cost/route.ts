@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { officeCosts } from "@/lib/db/schema";
+import { eq, and, asc } from "drizzle-orm";
 import { officeCostSchema } from "../_helpers";
 import { z } from "zod";
 
@@ -8,31 +10,37 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const month = parseInt(searchParams.get("month") || "");
-    const year  = parseInt(searchParams.get("year")  || "");
+    const year = parseInt(searchParams.get("year") || "");
 
     if (!month || !year) {
       return NextResponse.json({ message: "Month and Year are required." }, { status: 400 });
     }
 
-    const records = await (await getTenantPrisma()).officeCost.findMany({
-      where: { month, year },
-      orderBy: { day: "asc" },
-    });
+    const db = await getTenantDb();
 
-    // Previous month's closing Debit/Cred is the cumulative running balance of that month.
-    // We recalculate it here from the stored rows so the frontend can continue from the right number.
+    const records = await db
+      .select()
+      .from(officeCosts)
+      .where(and(eq(officeCosts.month, month), eq(officeCosts.year, year)))
+      .orderBy(asc(officeCosts.day));
+
+    // Previous month's closing balance
     let prevMonth = month - 1;
-    let prevYear  = year;
-    if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
 
-    const prevRecords = await (await getTenantPrisma()).officeCost.findMany({
-      where:   { month: prevMonth, year: prevYear },
-      orderBy: { day: "asc" },
-    });
+    const prevRecords = await db
+      .select()
+      .from(officeCosts)
+      .where(and(eq(officeCosts.month, prevMonth), eq(officeCosts.year, prevYear)))
+      .orderBy(asc(officeCosts.day));
 
     // Reconstruct the running balance from previous month
     let previousBalance = 0;
-    prevRecords.forEach(r => {
+    prevRecords.forEach((r) => {
       previousBalance += (r.payAmount || 0) - (r.bazarCost || 0);
     });
 
@@ -56,45 +64,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "No data provided." }, { status: 400 });
     }
 
-    await (await getTenantPrisma()).$transaction(async (tx) => {
-      for (const row of parsedData) {
-        const dateObj = new Date(row.date);
+    const db = await getTenantDb();
 
-        await tx.officeCost.upsert({
-          where: { month_year_day: { month: row.month, year: row.year, day: row.day } },
-          update: {
-            payAmount:       row.payAmount       ?? 0,
-            bazarCost:       row.bazarCost       ?? 0,
-            details:         row.details         ?? null,
-            extraCost:       row.extraCost       ?? 0,
-            extraDetail:     row.extraDetail     ?? null,
-            deposit:         row.deposit         ?? 0,
-            recurringCost:   row.recurringCost   ?? 0,
+    for (const row of parsedData) {
+      const dateStr = typeof row.date === "string" ? row.date : (row.date as Date).toISOString();
+
+      await db
+        .insert(officeCosts)
+        .values({
+          id: newId(),
+          date: dateStr,
+          month: row.month,
+          year: row.year,
+          day: row.day,
+          payAmount: row.payAmount ?? 0,
+          bazarCost: row.bazarCost ?? 0,
+          details: row.details ?? null,
+          extraCost: row.extraCost ?? 0,
+          extraDetail: row.extraDetail ?? null,
+          deposit: row.deposit ?? 0,
+          recurringCost: row.recurringCost ?? 0,
+          recurringDetail: row.recurringDetail ?? null,
+          capitalCost: row.capitalCost ?? 0,
+          capitalDetail: row.capitalDetail ?? null,
+          createdAt: now(),
+          updatedAt: now(),
+        })
+        .onConflictDoUpdate({
+          target: [officeCosts.month, officeCosts.year, officeCosts.day],
+          set: {
+            payAmount: row.payAmount ?? 0,
+            bazarCost: row.bazarCost ?? 0,
+            details: row.details ?? null,
+            extraCost: row.extraCost ?? 0,
+            extraDetail: row.extraDetail ?? null,
+            deposit: row.deposit ?? 0,
+            recurringCost: row.recurringCost ?? 0,
             recurringDetail: row.recurringDetail ?? null,
-            capitalCost:     row.capitalCost     ?? 0,
-            capitalDetail:   row.capitalDetail   ?? null,
-          },
-          create: {
-            date:            dateObj,
-            month:           row.month,
-            year:            row.year,
-            day:             row.day,
-            payAmount:       row.payAmount       ?? 0,
-            bazarCost:       row.bazarCost       ?? 0,
-            details:         row.details         ?? null,
-            extraCost:       row.extraCost       ?? 0,
-            extraDetail:     row.extraDetail     ?? null,
-            deposit:         row.deposit         ?? 0,
-            recurringCost:   row.recurringCost   ?? 0,
-            recurringDetail: row.recurringDetail ?? null,
-            capitalCost:     row.capitalCost     ?? 0,
-            capitalDetail:   row.capitalDetail   ?? null,
+            capitalCost: row.capitalCost ?? 0,
+            capitalDetail: row.capitalDetail ?? null,
+            updatedAt: now(),
           },
         });
-      }
-    }, {
-      timeout: 30000 // 30 seconds
-    });
+    }
 
     return NextResponse.json({ message: "Saved successfully" }, { status: 201 });
   } catch (error) {
@@ -104,4 +116,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to save office costs", error }, { status: 400 });
   }
 }
-

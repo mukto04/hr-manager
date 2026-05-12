@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
-import * as jose from "jose";
-
 export const runtime = "edge";
+import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import * as jose from "jose";
 
 const COOKIE_NAME = "hr_auth_token";
 const SESSION_SECRET = "appdevs-hr-portal-secure-vault-998877";
@@ -21,9 +22,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Server configuration error: Database URL missing." }, { status: 500 });
     }
 
-    const tenant = await masterPrisma.tenant.findUnique({
-      where: { slug: slug.toLowerCase() }
-    });
+    const tenant = await getDb()
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, slug.toLowerCase()))
+      .get();
 
     if (!tenant) {
       console.warn(`Login attempt for non-existent company: ${slug}`);
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
     // 3. Create Session Token (JWT) with Dynamic DB URL
     const secretKey = process.env.SESSION_SECRET || SESSION_SECRET;
     const secret = new TextEncoder().encode(secretKey);
-    
+
     console.log(`Generating token for ${tenant.companyName} (${tenant.slug})`);
 
     const token = await new jose.SignJWT({
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
       .setExpirationTime("24h")
       .sign(secret);
 
-    const response = NextResponse.json({ 
+    const response = NextResponse.json({
       message: "Login successful",
       companyName: tenant.companyName,
       slug: tenant.slug
@@ -79,9 +82,9 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error: any) {
     console.error("Multi-tenant login error:", error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: "An unexpected error occurred during login.",
-      detail: error.message 
+      detail: error.message
     }, { status: 500 });
   }
 }

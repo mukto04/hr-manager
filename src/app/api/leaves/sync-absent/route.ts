@@ -1,12 +1,14 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
-import { 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  format, 
-  isSaturday, 
+import { getTenantDb, newId, now } from "@/lib/db";
+import { employees, leaveBalances, leaveRecords, attendances, tenantSettings, holidays } from "@/lib/db/schema";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
+import {
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  format,
+  isSaturday,
   isSunday,
   isBefore,
   startOfDay
@@ -18,84 +20,86 @@ export async function POST(request: Request) {
     const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
     const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
 
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     // 1. Get Settings for mode check
-    const settings = await prisma.tenantSettings.findFirst();
+    const settings = await db.select().from(tenantSettings).limit(1).get();
     if (settings && settings.autoLeaveDeduction === false) {
       return NextResponse.json({ message: "Automatic deduction is disabled in settings." }, { status: 400 });
     }
 
     // 2. Get active employees
-    const employees = await prisma.employee.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        leaveBalances: { where: { year } }
-      }
-    });
+    const activeEmployees = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.status, "ACTIVE"));
 
-    // 3. Get Holidays
+    // 3. Get leave balances for the year for these employees
+    const empIds = activeEmployees.map((e) => e.id);
+    const balancesAll = empIds.length
+      ? await db
+          .select()
+          .from(leaveBalances)
+          .where(and(eq(leaveBalances.year, year)))
+      : [];
+    const balanceMap = Object.fromEntries(balancesAll.map((b) => [b.employeeId, b]));
+
+    // 4. Date range
     const startDate = startOfMonth(new Date(year, month - 1));
     const endDate = endOfMonth(startDate);
     const today = startOfDay(new Date());
-    
-    // We only sync up to today (or end of month if in past)
     const syncEnd = isBefore(today, endDate) ? today : endDate;
 
-    const holidays = await prisma.holiday.findMany({
-      where: {
-        date: {
-          gte: startDate,
-          lte: syncEnd
-        }
-      }
-    });
-    const holidayDates = new Set(holidays.map(h => format(h.date, "yyyy-MM-dd")));
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+    const syncEndStr = format(syncEnd, "yyyy-MM-dd");
 
-    // 4. Get all attendance records for the period to find gaps
-    const attendances = await prisma.attendance.findMany({
-      where: {
-        date: {
-          gte: startDate,
-          lte: syncEnd
-        }
-      }
-    });
+    // 5. Get Holidays in range
+    const holidayRows = await db
+      .select()
+      .from(holidays)
+      .where(and(gte(holidays.date, startDateStr), lte(holidays.date, syncEndStr)));
+    const holidayDates = new Set(holidayRows.map((h) => h.date.substring(0, 10)));
 
-    // Map of employeeId -> Set of dates they were present
+    // 6. Get all attendance records for the period
+    const attendanceRows = await db
+      .select()
+      .from(attendances)
+      .where(and(gte(attendances.date, startDateStr), lte(attendances.date, syncEndStr)));
+
     const attendanceMap = new Map<string, Set<string>>();
-    attendances.forEach(att => {
+    attendanceRows.forEach((att) => {
       if (!attendanceMap.has(att.employeeId)) {
         attendanceMap.set(att.employeeId, new Set());
       }
-      attendanceMap.get(att.employeeId)?.add(format(att.date, "yyyy-MM-dd"));
+      attendanceMap.get(att.employeeId)?.add(att.date.substring(0, 10));
     });
 
-    // 5. Get existing LeaveRecords (Automatic category) to avoid double deduction
-    const existingDeductions = await prisma.leaveRecord.findMany({
-      where: {
-        category: "AUTOMATIC",
-        year,
-        date: {
-          gte: startDate,
-          lte: syncEnd
-        }
-      }
-    });
+    // 7. Get existing automatic deduction records to avoid double deduction
+    const existingDeductions = await db
+      .select()
+      .from(leaveRecords)
+      .where(
+        and(
+          eq(leaveRecords.category, "AUTOMATIC"),
+          eq(leaveRecords.year, year),
+          gte(leaveRecords.date, startDateStr),
+          lte(leaveRecords.date, syncEndStr)
+        )
+      );
     const deductionMap = new Map<string, Set<string>>();
-    existingDeductions.forEach(rec => {
+    existingDeductions.forEach((rec) => {
       if (!deductionMap.has(rec.employeeId)) {
         deductionMap.set(rec.employeeId, new Set());
       }
-      deductionMap.get(rec.employeeId)?.add(format(rec.date, "yyyy-MM-dd"));
+      deductionMap.get(rec.employeeId)?.add(rec.date.substring(0, 10));
     });
 
     const days = eachDayOfInterval({ start: startDate, end: syncEnd });
     let createdCount = 0;
 
-    // 6. Process each employee
-    for (const employee of employees) {
-      const balance = employee.leaveBalances[0];
+    // 8. Process each employee
+    for (const employee of activeEmployees) {
+      const balance = balanceMap[employee.id];
       if (!balance) continue;
 
       const empAttendances = attendanceMap.get(employee.id) || new Set();
@@ -103,7 +107,7 @@ export async function POST(request: Request) {
 
       for (const day of days) {
         const dateKey = format(day, "yyyy-MM-dd");
-        
+
         // Skip if weekend or holiday
         if (isSaturday(day) || isSunday(day) || holidayDates.has(dateKey)) continue;
 
@@ -113,35 +117,34 @@ export async function POST(request: Request) {
         // Skip if already deducted
         if (empDeductions.has(dateKey)) continue;
 
-        // DEDUCT!
-        await prisma.$transaction(async (tx) => {
-          // Update Balance
-          await tx.leaveBalance.update({
-            where: { id: balance.id },
-            data: {
-              dueLeave: { decrement: 1 }
-            }
-          });
+        // DEDUCT: Update Balance
+        await db
+          .update(leaveBalances)
+          .set({
+            dueLeave: sql`${leaveBalances.dueLeave} - 1`,
+            updatedAt: now()
+          })
+          .where(eq(leaveBalances.id, balance.id));
 
-          // Create Record
-          await tx.leaveRecord.create({
-            data: {
-              employeeId: employee.id,
-              date: startOfDay(day),
-              amount: 1,
-              type: "DEDUCTION",
-              category: "AUTOMATIC",
-              note: "Automatic Absent Deduction",
-              year
-            }
-          });
+        // Create Record
+        await db.insert(leaveRecords).values({
+          id: newId(),
+          employeeId: employee.id,
+          date: startOfDay(day).toISOString(),
+          amount: 1,
+          type: "DEDUCTION",
+          category: "AUTOMATIC",
+          note: "Automatic Absent Deduction",
+          year,
+          createdAt: now(),
+          updatedAt: now()
         });
-        
+
         createdCount++;
       }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: "Absence synchronization completed.",
       count: createdCount
     });
@@ -151,4 +154,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: error.message || "Internal server error" }, { status: 500 });
   }
 }
-

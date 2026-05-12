@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -13,15 +15,15 @@ export async function GET(
       return NextResponse.json({ message: "Slug is required" }, { status: 400 });
     }
 
-    // Find tenant by slug
-    // We also support case-insensitive lookup for better UX
-    const tenant = await masterPrisma.tenant.findUnique({
-      where: { slug: slug.toLowerCase() },
-      select: {
-        companyName: true,
-        slug: true
-      }
-    });
+    // Find tenant by slug (case-insensitive)
+    const tenant = await getDb()
+      .select({
+        companyName: tenants.companyName,
+        slug: tenants.slug
+      })
+      .from(tenants)
+      .where(eq(tenants.slug, slug.toLowerCase()))
+      .get();
 
     if (!tenant) {
       return NextResponse.json({ message: "Company not found" }, { status: 404 });

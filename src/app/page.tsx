@@ -1,9 +1,10 @@
 export const runtime = "edge";
 import { LandingPage } from "@/modules/landing/landing-page";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb } from "@/lib/db";
+import { landingPageContents } from "@/lib/db/schema";
 
 export default async function IndexPage() {
-  const content = await masterPrisma.landingPageContent.findMany();
+  const content = await getDb().select().from(landingPageContents);
   
   // Convert array to a section-keyed object for initial hydration
   const initialData = content.reduce((acc, item) => {

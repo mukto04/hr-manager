@@ -3,10 +3,9 @@
  * Call createNotification() from any API route to send a notification to an employee.
  */
 
-
-
-
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { notifications } from "@/lib/db/schema";
+import { and, eq, isNull, lt } from "drizzle-orm";
 
 export type NotificationType =
   | "SALARY"
@@ -16,8 +15,7 @@ export type NotificationType =
   | "BREAK"
   | "PROFILE"
   | "PROJECT"
-  | "SYSTEM"
-;
+  | "SYSTEM";
 
 interface NotifyOptions {
   employeeId?: string;
@@ -33,21 +31,33 @@ export async function createNotification({
   type = "SYSTEM",
 }: NotifyOptions): Promise<void> {
   try {
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     // Auto-cleanup: Delete notifications older than 7 days for this employee (or HR)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    await prisma.notification.deleteMany({
-      where: {
-        employeeId: employeeId || null,
-        createdAt: { lt: sevenDaysAgo }
-      }
-    });
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString();
 
-    await prisma.notification.create({
-      data: { employeeId: employeeId || null, title, message, type },
+    if (employeeId) {
+      await db
+        .delete(notifications)
+        .where(
+          and(eq(notifications.employeeId, employeeId), lt(notifications.createdAt, sevenDaysAgoStr))
+        );
+    } else {
+      await db
+        .delete(notifications)
+        .where(and(isNull(notifications.employeeId), lt(notifications.createdAt, sevenDaysAgoStr)));
+    }
+
+    await db.insert(notifications).values({
+      id: newId(),
+      employeeId: employeeId ?? null,
+      title,
+      message,
+      type,
+      createdAt: now(),
+      updatedAt: now()
     });
   } catch (err) {
     // Never crash the main request due to a notification error

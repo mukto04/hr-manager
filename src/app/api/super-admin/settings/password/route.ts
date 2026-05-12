@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb, newId, now } from "@/lib/db";
+import { masterAdmins } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +13,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Identify current master password
-    const adminConfig = await masterPrisma.masterAdmin.findFirst();
+    const adminConfig = await getDb()
+      .select()
+      .from(masterAdmins)
+      .get();
     const masterPassword = adminConfig?.password || process.env.SUPER_ADMIN_PASSWORD || "superadmin123";
 
     if (currentPassword !== masterPassword) {
@@ -20,14 +25,14 @@ export async function POST(request: NextRequest) {
 
     // Upsert the new password
     if (adminConfig) {
-      await masterPrisma.masterAdmin.update({
-        where: { id: adminConfig.id },
-        data: { password: newPassword, updatedAt: new Date() }
-      });
+      await getDb()
+        .update(masterAdmins)
+        .set({ password: newPassword, updatedAt: now() })
+        .where(eq(masterAdmins.id, adminConfig.id));
     } else {
-      await masterPrisma.masterAdmin.create({
-        data: { password: newPassword }
-      });
+      await getDb()
+        .insert(masterAdmins)
+        .values({ id: newId(), password: newPassword, updatedAt: now() });
     }
 
     return NextResponse.json({ message: "Master password updated successfully" });
@@ -36,4 +41,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to update password", error: error.message }, { status: 500 });
   }
 }
-

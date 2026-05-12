@@ -1,28 +1,36 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { projects, projectPayments } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const prisma = await getTenantPrisma();
-    const payments = await prisma.projectPayment.findMany({
-      include: {
-        project: {
-          select: {
-            name: true,
-            id: true
-          }
-        }
-      },
-      orderBy: { date: "desc" }
-    });
+    const db = await getTenantDb();
 
-    const formattedPayments = payments.map(p => ({
+    const payments = await db
+      .select({
+        id: projectPayments.id,
+        projectId: projectPayments.projectId,
+        amount: projectPayments.amount,
+        date: projectPayments.date,
+        method: projectPayments.method,
+        reference: projectPayments.reference,
+        note: projectPayments.note,
+        createdAt: projectPayments.createdAt,
+        updatedAt: projectPayments.updatedAt,
+        projectName: projects.name,
+      })
+      .from(projectPayments)
+      .leftJoin(projects, eq(projectPayments.projectId, projects.id))
+      .orderBy(desc(projectPayments.date));
+
+    const formattedPayments = payments.map((p) => ({
       ...p,
-      projectName: p.project.name,
-      projectId: p.project.id
+      projectName: p.projectName,
+      projectId: p.projectId,
     }));
 
     return NextResponse.json(formattedPayments);
@@ -31,4 +39,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Failed to fetch all payments", error: error.message }, { status: 500 });
   }
 }
-

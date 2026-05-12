@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { projectPayments } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -8,11 +10,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const prisma = await getTenantPrisma();
-    const payments = await prisma.projectPayment.findMany({
-      where: { projectId: id },
-      orderBy: { date: "desc" }
-    });
+    const db = await getTenantDb();
+
+    const payments = await db
+      .select()
+      .from(projectPayments)
+      .where(eq(projectPayments.projectId, id))
+      .orderBy(desc(projectPayments.date));
 
     return NextResponse.json(payments);
   } catch (error: any) {
@@ -28,22 +32,27 @@ export async function POST(
   try {
     const { id } = await params;
     const data = (await request.json()) as any;
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     if (!data.amount) {
       return NextResponse.json({ message: "Amount is required" }, { status: 400 });
     }
 
-    const payment = await prisma.projectPayment.create({
-      data: {
+    const payment = await db
+      .insert(projectPayments)
+      .values({
+        id: newId(),
         projectId: id,
         amount: parseFloat(data.amount),
-        date: data.date ? new Date(data.date) : new Date(),
+        date: data.date ? data.date : now(),
         method: data.method || "Bank",
         reference: data.reference || null,
-        note: data.note || null
-      }
-    });
+        note: data.note || null,
+        createdAt: now(),
+        updatedAt: now(),
+      })
+      .returning()
+      .get();
 
     return NextResponse.json(payment, { status: 201 });
   } catch (error: any) {

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse, NextRequest } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { employees } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -14,12 +16,12 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       );
     }
 
-    const employee = await (await getTenantPrisma()).employee.update({
-      where: { id },
-      data: {
-        password: body.password
-      }
-    });
+    const db = await getTenantDb();
+
+    await db
+      .update(employees)
+      .set({ password: body.password, updatedAt: now() })
+      .where(eq(employees.id, id));
 
     return NextResponse.json({ message: "Password updated successfully" });
   } catch (error) {

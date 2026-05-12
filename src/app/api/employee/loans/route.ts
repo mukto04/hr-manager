@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { loans, advanceSalaries } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET() {
@@ -10,23 +12,24 @@ export async function GET() {
   }
 
   try {
-    const loans = await (await getTenantPrisma()).loan.findMany({
-      where: { employeeId },
-      orderBy: { createdAt: "desc" }
-    });
+    const db = await getTenantDb();
 
-    const advances = await (await getTenantPrisma()).advanceSalary.findMany({
-      where: { employeeId },
-      orderBy: [
-        { year: "desc" },
-        { month: "desc" }
-      ]
-    });
+    const [empLoans, advances] = await Promise.all([
+      db
+        .select()
+        .from(loans)
+        .where(eq(loans.employeeId, employeeId))
+        .orderBy(desc(loans.createdAt)),
+      db
+        .select()
+        .from(advanceSalaries)
+        .where(eq(advanceSalaries.employeeId, employeeId))
+        .orderBy(desc(advanceSalaries.year), desc(advanceSalaries.month))
+    ]);
 
-    return NextResponse.json({ loans, advances });
+    return NextResponse.json({ loans: empLoans, advances });
   } catch (error) {
     console.error("Loans API error:", error);
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

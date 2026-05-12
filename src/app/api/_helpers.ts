@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { z } from "zod";
 import { calculateDueAmount, calculateSalaryBreakdown } from "@/utils/calculations";
 

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse, NextRequest } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { employees } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function PUT(req: NextRequest) {
@@ -21,12 +23,12 @@ export async function PUT(req: NextRequest) {
 
     // In a production environment, verify old password before setting new.
     // For this demonstration/current scope, we directly set the new password.
-    await (await getTenantPrisma()).employee.update({
-      where: { id: employeeId },
-      data: {
-        password: body.password
-      }
-    });
+    const db = await getTenantDb();
+
+    await db
+      .update(employees)
+      .set({ password: body.password, updatedAt: now() })
+      .where(eq(employees.id, employeeId));
 
     return NextResponse.json({ message: "Password updated successfully" });
   } catch (error) {
@@ -34,4 +36,3 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

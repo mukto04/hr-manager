@@ -1,7 +1,9 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth, format } from "date-fns";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { breakRecords, employees } from "@/lib/db/schema";
+import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
+import { endOfMonth } from "date-fns";
 
 export async function GET(request: Request) {
   try {
@@ -12,35 +14,41 @@ export async function GET(request: Request) {
 
     const startDate = new Date(year, month - 1, 1);
     const endDate = endOfMonth(startDate);
+    const startDateStr = startDate.toISOString();
+    const endDateStr = endDate.toISOString();
 
-    const where: any = {
-      date: {
-        gte: startDate,
-        lte: endDate,
-      }
-    };
+    const db = await getTenantDb();
 
-    if (employeeId && employeeId !== "all") {
-      where.employeeId = employeeId;
-    }
+    const records = await db
+      .select()
+      .from(breakRecords)
+      .where(
+        and(
+          gte(breakRecords.date, startDateStr),
+          lte(breakRecords.date, endDateStr),
+          ...(employeeId && employeeId !== "all" ? [eq(breakRecords.employeeId, employeeId)] : [])
+        )
+      )
+      .orderBy(desc(breakRecords.startTime));
 
-    const breakRecords = await (await getTenantPrisma()).breakRecord.findMany({
-      where,
-      include: {
-        employee: {
-          select: {
-            name: true,
-            employeeCode: true,
-            image: true,
-          }
-        }
-      },
-      orderBy: {
-        startTime: "desc"
-      }
-    });
+    // Fetch employee info separately
+    const empIds = [...new Set(records.map(r => r.employeeId))];
+    const emps = empIds.length
+      ? await db
+          .select({
+            id: employees.id,
+            name: employees.name,
+            employeeCode: employees.employeeCode,
+            image: employees.image,
+          })
+          .from(employees)
+          .where(inArray(employees.id, empIds))
+      : [];
+    const empMap = Object.fromEntries(emps.map(e => [e.id, e]));
 
-    return NextResponse.json(breakRecords);
+    const result = records.map(r => ({ ...r, employee: empMap[r.employeeId] || null }));
+
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("Error fetching break records:", error);
     return NextResponse.json({ message: "Failed to fetch break records" }, { status: 500 });
@@ -50,7 +58,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as any;
-    const { employeeId, date, startTime, endTime, note } = body;
+    const { employeeId, startTime, endTime, note } = body;
 
     if (!employeeId) {
       return NextResponse.json({ message: "Employee ID is required" }, { status: 400 });
@@ -67,25 +75,36 @@ export async function POST(request: Request) {
     // Normalize date to midnight of the start time's date
     const recordDate = new Date(start);
     recordDate.setHours(0, 0, 0, 0);
+    const recordDateStr = recordDate.toISOString();
 
-    const breakRecord = await (await getTenantPrisma()).breakRecord.create({
-      data: {
+    const db = await getTenantDb();
+
+    const breakRecord = await db
+      .insert(breakRecords)
+      .values({
+        id: newId(),
         employeeId,
-        date: recordDate,
-        startTime: start,
-        endTime: end,
+        date: recordDateStr,
+        startTime: start.toISOString(),
+        endTime: end ? end.toISOString() : null,
         duration,
-        note,
-      },
-      include: {
-        employee: true
-      }
-    });
+        note: note || null,
+        createdAt: now(),
+        updatedAt: now(),
+      })
+      .returning()
+      .get();
 
-    return NextResponse.json(breakRecord);
+    // Fetch employee for response
+    const employee = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.id, employeeId))
+      .get();
+
+    return NextResponse.json({ ...breakRecord, employee: employee || null });
   } catch (error: any) {
     console.error("Error creating break record:", error);
     return NextResponse.json({ message: "Failed to create break record" }, { status: 500 });
   }
 }
-

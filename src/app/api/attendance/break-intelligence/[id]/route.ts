@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { breakRecords } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function PUT(
   request: Request,
@@ -21,17 +23,23 @@ export async function PUT(
 
     const recordDate = new Date(start);
     recordDate.setHours(0, 0, 0, 0);
+    const recordDateStr = recordDate.toISOString();
 
-    const breakRecord = await (await getTenantPrisma()).breakRecord.update({
-      where: { id },
-      data: {
-        date: recordDate,
-        startTime: start,
-        endTime: end,
+    const db = await getTenantDb();
+
+    const breakRecord = await db
+      .update(breakRecords)
+      .set({
+        date: recordDateStr,
+        startTime: start.toISOString(),
+        endTime: end ? end.toISOString() : null,
         duration,
-        note,
-      },
-    });
+        note: note || null,
+        updatedAt: now(),
+      })
+      .where(eq(breakRecords.id, id))
+      .returning()
+      .get();
 
     return NextResponse.json(breakRecord);
   } catch (error: any) {
@@ -41,15 +49,14 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
 
-    await (await getTenantPrisma()).breakRecord.delete({
-      where: { id },
-    });
+    const db = await getTenantDb();
+    await db.delete(breakRecords).where(eq(breakRecords.id, id));
 
     return NextResponse.json({ message: "Break record deleted successfully" });
   } catch (error: any) {

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { attendances, holidays, breakRecords, tenantSettings } from "@/lib/db/schema";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET(request: NextRequest) {
@@ -14,40 +16,60 @@ export async function GET(request: NextRequest) {
   const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
 
   try {
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     // Bangladesh Time (BDT) is UTC+6
     const startOfMonth = new Date(Date.UTC(year, month - 1, 1, -6, 0, 0, 0));
     const endOfMonth = new Date(Date.UTC(year, month, 0, 17, 59, 59, 999));
 
     // Parallel fetch for speed
-    const [attendances, holidays, breakRecords, settings] = await Promise.all([
-      prisma.attendance.findMany({
-        where: { employeeId, date: { gte: startOfMonth, lte: endOfMonth } }
-      }),
-      prisma.holiday.findMany({
-        where: { date: { gte: startOfMonth, lte: endOfMonth } }
-      }),
-      prisma.breakRecord.findMany({
-        where: { employeeId, date: { gte: startOfMonth, lte: endOfMonth } }
-      }),
-      prisma.tenantSettings.findFirst()
+    const [empAttendances, empHolidays, empBreakRecords, settings] = await Promise.all([
+      db
+        .select()
+        .from(attendances)
+        .where(
+          and(
+            eq(attendances.employeeId, employeeId),
+            gte(attendances.date, startOfMonth.toISOString()),
+            lte(attendances.date, endOfMonth.toISOString())
+          )
+        ),
+      db
+        .select()
+        .from(holidays)
+        .where(
+          and(
+            gte(holidays.date, startOfMonth.toISOString()),
+            lte(holidays.date, endOfMonth.toISOString())
+          )
+        ),
+      db
+        .select()
+        .from(breakRecords)
+        .where(
+          and(
+            eq(breakRecords.employeeId, employeeId),
+            gte(breakRecords.date, startOfMonth.toISOString()),
+            lte(breakRecords.date, endOfMonth.toISOString())
+          )
+        ),
+      db.select().from(tenantSettings).get()
     ]);
 
     const breakMap = new Map();
-    breakRecords.forEach(b => {
+    empBreakRecords.forEach(b => {
       const day = parseInt(new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Asia/Dhaka' }).format(new Date(b.date)));
       breakMap.set(day, (breakMap.get(day) || 0) + b.duration);
     });
 
     const attMap = new Map();
-    attendances.forEach(a => {
+    empAttendances.forEach(a => {
       const day = parseInt(new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Asia/Dhaka' }).format(new Date(a.date)));
       attMap.set(day, a);
     });
 
     const holMap = new Map();
-    holidays.forEach(h => {
+    empHolidays.forEach(h => {
       const day = parseInt(new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Asia/Dhaka' }).format(new Date(h.date)));
       holMap.set(day, h);
     });
@@ -56,15 +78,14 @@ export async function GET(request: NextRequest) {
     let presentCount = 0;
     let absentCount = 0;
     let totalWorkingMins = 0;
-    let validWorkingDaysForAvg = 0;
 
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
     for (let d = 1; d <= endOfMonth.getDate(); d++) {
       const currentD = new Date(year, month - 1, d);
       const isWeekend = currentD.getDay() === 0 || currentD.getDay() === 6;
-      
+
       let status = "ABSENT";
       let checkIn = null;
       let checkOut = null;
@@ -78,22 +99,22 @@ export async function GET(request: NextRequest) {
         checkIn = att.checkIn;
         checkOut = att.checkOut;
         note = att.note;
-        
+
         if (["PRESENT", "LATE", "HALF_DAY"].includes(status)) {
           presentCount += (status === "HALF_DAY" ? 0.5 : 1.0);
-          
+
           if (checkIn && checkOut) {
             const ci = new Date(checkIn);
             const co = new Date(checkOut);
-            
+
             // Only calculate if checkOut is actually after checkIn
             if (co.getTime() > ci.getTime()) {
               let dailyMins = Math.floor((co.getTime() - ci.getTime()) / 60000);
-              
+
               // Subtract break duration for this day
               const breakMins = breakMap.get(d) || 0;
               dailyMins = Math.max(0, dailyMins - breakMins);
-              
+
               totalWorkingMins += dailyMins;
             }
           }
@@ -105,7 +126,7 @@ export async function GET(request: NextRequest) {
           note = hol.name;
         }
       }
-      
+
       if (!att && status === "ABSENT") {
         if (currentD > today) status = "UPCOMING";
         else absentCount++;
@@ -144,4 +165,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

@@ -1,6 +1,14 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import {
+  employees,
+  salaryStructures,
+  leaveBalances,
+  advanceSalaries,
+  loans,
+} from "@/lib/db/schema";
+import { eq, and, or, lt, lte, isNull, gt } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -16,56 +24,73 @@ export async function GET(request: NextRequest) {
     const parsedMonth = parseInt(month, 10);
     const parsedYear = parseInt(year, 10);
 
-    const employee = await (await getTenantPrisma()).employee.findUnique({
-      where: { id: employeeId },
-      include: {
-        salaryStructure: true,
-        leaveBalances: true,
-      }
-    });
+    const db = await getTenantDb();
+
+    const employee = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.id, employeeId))
+      .get();
 
     if (!employee) {
       return NextResponse.json({ message: "Employee not found" }, { status: 404 });
     }
 
-    const totalSalary = employee.salaryStructure?.totalSalary || 0;
-    
+    const structure = await db
+      .select()
+      .from(salaryStructures)
+      .where(eq(salaryStructures.employeeId, employeeId))
+      .get();
+
+    const totalSalary = structure?.totalSalary || 0;
+
     // Working days based on due leaves (negative means overused)
-    const leaveBalance = employee.leaveBalances?.find(lb => lb.year === parsedYear);
+    const empLeaveBalances = await db
+      .select()
+      .from(leaveBalances)
+      .where(eq(leaveBalances.employeeId, employeeId));
+
+    const leaveBalance = empLeaveBalances.find(lb => lb.year === parsedYear);
     const dueLeave = leaveBalance?.dueLeave || 0;
-    const workingDays = dueLeave < 0 ? 30 + dueLeave : 30; // standard 30 days
+    const workingDays = dueLeave < 0 ? 30 + dueLeave : 30;
     const workingDaySalary = (totalSalary / 30) * workingDays;
 
     // Advance Salary deduction
-    const advances = await (await getTenantPrisma()).advanceSalary.findMany({
-      where: {
-        employeeId: employeeId,
-        month: parsedMonth,
-        year: parsedYear,
-        isDeducted: false, 
-      }
-    });
+    const advances = await db
+      .select()
+      .from(advanceSalaries)
+      .where(
+        and(
+          eq(advanceSalaries.employeeId, employeeId),
+          eq(advanceSalaries.month, parsedMonth),
+          eq(advanceSalaries.year, parsedYear),
+          eq(advanceSalaries.isDeducted, false)
+        )
+      );
     let advanceSalaryAmount = advances.reduce((sum, adv) => sum + adv.amount, 0);
 
     // Loan adjustment deduction
-    const loans = await (await getTenantPrisma()).loan.findMany({
-      where: {
-        employeeId: employeeId,
-        dueAmount: { gt: 0 },
-        OR: [
-          { startYear: null },
-          { startYear: { lt: parsedYear } },
-          { startYear: parsedYear, startMonth: { lte: parsedMonth } },
-          { startYear: parsedYear, startMonth: null }
-        ]
-      }
-    });
-    
-    let baseLoanAdjustAmount = loans.reduce((sum, loan) => {
+    const empLoans = await db
+      .select()
+      .from(loans)
+      .where(
+        and(
+          eq(loans.employeeId, employeeId),
+          gt(loans.dueAmount, 0),
+          or(
+            isNull(loans.startYear),
+            lt(loans.startYear, parsedYear),
+            and(eq(loans.startYear, parsedYear), lte(loans.startMonth, parsedMonth)),
+            and(eq(loans.startYear, parsedYear), isNull(loans.startMonth))
+          )
+        )
+      );
+
+    let baseLoanAdjustAmount = empLoans.reduce((sum, loan) => {
       return sum + Math.min(loan.installmentAmount, loan.dueAmount);
     }, 0);
 
-    const festivalBonus = employee.salaryStructure?.festivalBonus || 0;
+    const festivalBonus = structure?.festivalBonus || 0;
     const availableTotal = workingDaySalary + festivalBonus;
 
     let loanAdjustAmount = 0;
@@ -81,7 +106,7 @@ export async function GET(request: NextRequest) {
     }
 
     advanceSalaryAmount = advanceSalaryAmountFinal;
-    
+
     const leaveDeductionAmount = Math.max(0, totalSalary - workingDaySalary);
     const payableSalary = availableTotal - loanAdjustAmount - advanceSalaryAmount;
 
@@ -99,4 +124,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Failed to calculate figures", error }, { status: 500 });
   }
 }
-

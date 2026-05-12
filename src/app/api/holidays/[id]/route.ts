@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { holidays } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { holidaySchema } from "@/app/api/_helpers";
 
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -8,13 +10,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const { id } = await context.params;
     const parsed = holidaySchema.parse((await request.json()) as any);
 
-    const holiday = await (await getTenantPrisma()).holiday.update({
-      where: { id },
-      data: {
+    const db = await getTenantDb();
+    const holiday = await db
+      .update(holidays)
+      .set({
         ...parsed,
-        date: new Date(parsed.date)
-      }
-    });
+        date: new Date(parsed.date).toISOString().substring(0, 10),
+        updatedAt: now()
+      })
+      .where(eq(holidays.id, id))
+      .returning()
+      .get();
 
     return NextResponse.json(holiday);
   } catch (error) {
@@ -25,7 +31,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    await (await getTenantPrisma()).holiday.delete({ where: { id } });
+    const db = await getTenantDb();
+    await db.delete(holidays).where(eq(holidays.id, id));
     return NextResponse.json({ message: "Holiday deleted successfully" });
   } catch (error) {
     return NextResponse.json({ message: "Failed to delete holiday", error }, { status: 400 });

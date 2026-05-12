@@ -1,19 +1,22 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { notices } from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const prisma = await getTenantPrisma();
-    const notices = await prisma.notice.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5 // Get latest 5 notices
-    });
+    const db = await getTenantDb();
 
-    return NextResponse.json(notices);
+    const empNotices = await db
+      .select()
+      .from(notices)
+      .orderBy(desc(notices.createdAt))
+      .limit(5); // Get latest 5 notices
+
+    return NextResponse.json(empNotices);
   } catch (error) {
     console.error("Notices API error:", error);
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

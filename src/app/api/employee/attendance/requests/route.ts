@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { attendanceRequests, employees } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET(request: NextRequest) {
@@ -10,10 +12,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const requests = await (await getTenantPrisma()).attendanceRequest.findMany({
-      where: { employeeId },
-      orderBy: { createdAt: "desc" },
-    });
+    const db = await getTenantDb();
+
+    const requests = await db
+      .select()
+      .from(attendanceRequests)
+      .where(eq(attendanceRequests.employeeId, employeeId))
+      .orderBy(desc(attendanceRequests.createdAt));
+
     return NextResponse.json(requests);
   } catch (error) {
     console.error("Fetch requests error:", error);
@@ -46,24 +52,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const newRequest = await (await getTenantPrisma()).attendanceRequest.create({
-      data: {
+    const db = await getTenantDb();
+
+    const newRequest = await db
+      .insert(attendanceRequests)
+      .values({
+        id: newId(),
         employeeId,
-        date: new Date(date),
-        checkIn: checkIn ? new Date(checkIn) : null,
-        checkOut: checkOut ? new Date(checkOut) : null,
+        date: new Date(date).toISOString(),
+        checkIn: checkIn ? new Date(checkIn).toISOString() : null,
+        checkOut: checkOut ? new Date(checkOut).toISOString() : null,
         reason,
         attachment: attachment || null,
         status: "PENDING",
-      },
-      include: { employee: true }
-    });
+        createdAt: now(),
+        updatedAt: now()
+      })
+      .returning()
+      .get();
+
+    // Fetch employee name for notification
+    const employee = await db
+      .select({ name: employees.name })
+      .from(employees)
+      .where(eq(employees.id, employeeId))
+      .get();
 
     // Notify HR
     const { createNotification } = await import("@/lib/notify");
     await createNotification({
       title: "New Attendance Request",
-      message: `${newRequest.employee?.name || 'An employee'} submitted an attendance request for ${new Date(date).toLocaleDateString()}. Reason: ${reason}`,
+      message: `${employee?.name || 'An employee'} submitted an attendance request for ${new Date(date).toLocaleDateString()}. Reason: ${reason}`,
       type: "ATTENDANCE"
     }); // No employeeId means it goes to HR
 
@@ -73,4 +92,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

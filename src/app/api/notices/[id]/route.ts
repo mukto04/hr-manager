@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { notices } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function PATCH(
   request: NextRequest,
@@ -11,11 +13,13 @@ export async function PATCH(
     const body = (await request.json()) as any;
     const { title, content, image, file } = body;
 
-    const prisma = await getTenantPrisma();
-    const notice = await prisma.notice.update({
-      where: { id },
-      data: { title, content, image, file }
-    });
+    const db = await getTenantDb();
+    const notice = await db
+      .update(notices)
+      .set({ title, content, image, file, updatedAt: now() })
+      .where(eq(notices.id, id))
+      .returning()
+      .get();
 
     return NextResponse.json(notice);
   } catch (error: any) {
@@ -30,12 +34,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const prisma = await getTenantPrisma();
-    
-    await prisma.notice.delete({
-      where: { id }
-    });
-
+    const db = await getTenantDb();
+    await db.delete(notices).where(eq(notices.id, id));
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Notice Delete Error:", error);

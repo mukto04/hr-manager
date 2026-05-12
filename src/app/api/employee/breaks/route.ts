@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { breakRecords } from "@/lib/db/schema";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET(request: NextRequest) {
@@ -14,21 +16,22 @@ export async function GET(request: NextRequest) {
   const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
 
   try {
-    const prisma = await getTenantPrisma();
-    
+    const db = await getTenantDb();
+
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59);
 
-    const breaks = await prisma.breakRecord.findMany({
-      where: {
-        employeeId,
-        date: {
-          gte: startOfMonth,
-          lte: endOfMonth
-        }
-      },
-      orderBy: { date: "desc" }
-    });
+    const breaks = await db
+      .select()
+      .from(breakRecords)
+      .where(
+        and(
+          eq(breakRecords.employeeId, employeeId),
+          gte(breakRecords.date, startOfMonth.toISOString()),
+          lte(breakRecords.date, endOfMonth.toISOString())
+        )
+      )
+      .orderBy(desc(breakRecords.date));
 
     return NextResponse.json(breaks);
   } catch (error) {
@@ -36,4 +39,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, now } from "@/lib/db";
+import { employees, salaryStructures, monthlySalaries, tenantSettings } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { employeeSchema } from "@/app/api/_helpers";
 import { calculateSalaryBreakdown } from "@/utils/calculations";
 
@@ -15,16 +17,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     // Allow explicit status updates (e.g., restore from DISABLED -> ACTIVE)
     const statusOverride = (rawData.status as string | undefined) ?? undefined;
 
-    // @ts-ignore
-    const employee = await (await getTenantPrisma()).employee.update({
-      where: { id },
-      data: {
+    const db = await getTenantDb();
+
+    const employee = await db
+      .update(employees)
+      .set({
         ...employeeData,
         email: employeeData.email || null,
         department: employeeData.department || null,
         phone: employeeData.phone || null,
-        joiningDate: new Date(employeeData.joiningDate),
-        dateOfBirth: new Date(employeeData.dateOfBirth),
+        joiningDate: new Date(employeeData.joiningDate).toISOString(),
+        dateOfBirth: new Date(employeeData.dateOfBirth).toISOString(),
         bloodGroup: employeeData.bloodGroup || null,
         guardianName: employeeData.guardianName || null,
         guardianRelation: employeeData.guardianRelation || null,
@@ -32,41 +35,53 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         nidNumber: employeeData.nidNumber || null,
         educationStatus: employeeData.educationStatus || null,
         customData: employeeData.customData || {},
-        ...(statusOverride ? { status: statusOverride } : {})
-      }
-    });
+        ...(statusOverride ? { status: statusOverride } : {}),
+        updatedAt: now()
+      })
+      .where(eq(employees.id, id))
+      .returning()
+      .get();
 
     if (salary !== undefined && salary > 0) {
-      const prisma = await getTenantPrisma();
-      const settings = await prisma.tenantSettings.findFirst();
+      const settings = await db.select().from(tenantSettings).get();
       const salaryBreakdown = calculateSalaryBreakdown(salary, settings?.salaryStructure as any[] | undefined);
 
-      await prisma.salaryStructure.upsert({
-        where: { employeeId: id },
-        create: {
+      await db
+        .insert(salaryStructures)
+        .values({
+          id: crypto.randomUUID(),
           employeeId: id,
           totalSalary: salary,
-          ...salaryBreakdown
-        },
-        update: {
-          totalSalary: salary,
-          ...salaryBreakdown
-        }
-      });
+          ...salaryBreakdown,
+          createdAt: now(),
+          updatedAt: now()
+        } as any)
+        .onConflictDoUpdate({
+          target: salaryStructures.employeeId,
+          set: {
+            totalSalary: salary,
+            ...salaryBreakdown,
+            updatedAt: now()
+          }
+        });
 
-      const now = new Date();
+      const currentNow = new Date();
       const { festivalBonus, ...breakdown } = salaryBreakdown;
-      await (await getTenantPrisma()).monthlySalary.updateMany({
-        where: {
-          employeeId: id,
-          month: now.getMonth() + 1,
-          year: now.getFullYear()
-        },
-        data: {
+      // updateMany equivalent: update all matching rows
+      await db
+        .update(monthlySalaries)
+        .set({
           totalSalary: salary,
-          ...breakdown
-        }
-      });
+          ...breakdown,
+          updatedAt: now()
+        })
+        .where(
+          and(
+            eq(monthlySalaries.employeeId, id),
+            eq(monthlySalaries.month, currentNow.getMonth() + 1),
+            eq(monthlySalaries.year, currentNow.getFullYear())
+          )
+        );
     }
 
     return NextResponse.json(employee);
@@ -78,10 +93,13 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    await (await getTenantPrisma()).employee.update({
-      where: { id },
-      data: { status: "DEACTIVE" }
-    });
+    const db = await getTenantDb();
+
+    await db
+      .update(employees)
+      .set({ status: "DEACTIVE", updatedAt: now() })
+      .where(eq(employees.id, id));
+
     return NextResponse.json({ message: "Employee deleted successfully" });
   } catch (error) {
     return NextResponse.json({ message: "Failed to delete employee", error }, { status: 400 });

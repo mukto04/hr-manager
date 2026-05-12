@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getDb, getDbBySlug, getTenantDb, now } from "@/lib/db";
+import { attendanceDevices } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,48 +11,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "API Key is required" }, { status: 401 });
     }
 
-    const { machineStatus, error } = (await request.json()) as any;
+    const { machineStatus } = (await request.json()) as any;
 
     let tenantSlug = request.headers.get("x-tenant-slug");
     if (tenantSlug && tenantSlug.endsWith("-hr")) {
-       tenantSlug = tenantSlug.replace("-hr", "");
+      tenantSlug = tenantSlug.replace("-hr", "");
     }
-    
-    let prisma;
-    
+
+    let db;
     try {
-        if (tenantSlug && !['default', 'attendance', 'undefined', ''].includes(tenantSlug)) {
-            const { getPrismaBySlug } = await import("@/lib/prisma");
-            prisma = await getPrismaBySlug(tenantSlug);
-        } else {
-            prisma = await getTenantPrisma();
-        }
+      if (tenantSlug && !['default', 'attendance', 'undefined', ''].includes(tenantSlug)) {
+        db = await getDbBySlug(tenantSlug);
+      } else {
+        db = await getTenantDb();
+      }
     } catch (e) {
-        // Final fallback for local development without multi-tenancy active
-        const { masterPrisma } = await import("@/lib/prisma");
-        prisma = masterPrisma;
+      // Final fallback for local development without multi-tenancy active
+      db = getDb();
     }
 
     // Find the device
-    const device = await prisma.attendanceDevice.findUnique({
-      where: { apiKey }
-    });
+    const device = await db
+      .select()
+      .from(attendanceDevices)
+      .where(eq(attendanceDevices.apiKey, apiKey))
+      .get();
 
     if (!device) {
       return NextResponse.json({ message: "Invalid API Key" }, { status: 401 });
     }
 
     // Update lastSeen and potentially status
-    // If machineStatus is provided, we can use it to distinguish between agent status and machine status
-    await prisma.attendanceDevice.update({
-      where: { id: device.id },
-      data: {
-        lastSeen: new Date(),
-        status: machineStatus === "CONNECTED" ? "ACTIVE" : "DISCONNECTED"
-      }
-    });
+    await db
+      .update(attendanceDevices)
+      .set({
+        lastSeen: now(),
+        status: machineStatus === "CONNECTED" ? "ACTIVE" : "DISCONNECTED",
+        updatedAt: now(),
+      })
+      .where(eq(attendanceDevices.id, device.id));
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: "Heartbeat received",
       agentStatus: "ONLINE",
       machineStatus: machineStatus || "UNKNOWN"
@@ -61,4 +62,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

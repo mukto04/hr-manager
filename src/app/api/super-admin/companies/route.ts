@@ -1,21 +1,24 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb, newId, now } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
   try {
     console.log("Super Admin: Fetching companies...");
-    const tenants = await masterPrisma.tenant.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    console.log(`Super Admin: Found ${tenants?.length || 0} companies.`);
-    return NextResponse.json(tenants || []);
+    const result = await getDb()
+      .select()
+      .from(tenants)
+      .orderBy(desc(tenants.createdAt));
+    console.log(`Super Admin: Found ${result?.length || 0} companies.`);
+    return NextResponse.json(result || []);
   } catch (error: any) {
     console.error("Super Admin Fetch Error:", error);
-    return NextResponse.json({ 
-      message: "Failed to fetch tenants", 
+    return NextResponse.json({
+      message: "Failed to fetch tenants",
       error: error.message,
-      stack: error.stack 
+      stack: error.stack
     }, { status: 500 });
   }
 }
@@ -31,9 +34,8 @@ export async function POST(request: NextRequest) {
 
     // Default to 30 days if not provided
     const days = parseInt(subscriptionDays) || 30;
-    const subscriptionStart = new Date();
-    const subscriptionEnd = new Date();
-    subscriptionEnd.setDate(subscriptionEnd.getDate() + days);
+    const subscriptionStart = new Date().toISOString();
+    const subscriptionEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
     // Default Full Permissions for new tenants
     const defaultPermissions = {
@@ -52,8 +54,10 @@ export async function POST(request: NextRequest) {
       Enterprise: 5000
     };
 
-    const tenant = await masterPrisma.tenant.create({
-      data: {
+    const tenant = await getDb()
+      .insert(tenants)
+      .values({
+        id: newId(),
         slug: slug.toLowerCase().trim().replace(/\s+/g, "-"),
         companyName,
         dbUrl: dbUrl.trim(),
@@ -64,15 +68,17 @@ export async function POST(request: NextRequest) {
         planName: planName || "Starter",
         employeeLimit: employeeLimit || limits[planName as string] || 50,
         permissions: defaultPermissions,
-        status: "ACTIVE"
-      }
-    });
+        status: "ACTIVE",
+        createdAt: now()
+      })
+      .returning()
+      .get();
 
     return NextResponse.json(tenant, { status: 201 });
   } catch (error: any) {
     console.error("Tenant Creation Error:", error);
-    return NextResponse.json({ 
-      message: `Failed to create tenant. ${error.message || "Unknown error"}. Maybe the URL slug already exists?` 
+    return NextResponse.json({
+      message: `Failed to create tenant. ${error.message || "Unknown error"}. Maybe the URL slug already exists?`
     }, { status: 500 });
   }
 }
@@ -87,16 +93,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: "Missing tenant ID" }, { status: 400 });
     }
 
-    // Sanitize data (remove nulls/undefined for Prisma update if needed)
+    // Sanitize data
     const updateData: any = { ...data };
 
     // Renewal logic: if subscriptionDays is provided, add to existing end date or start from now if expired
     if (subscriptionDays) {
       const daysToAdd = parseInt(subscriptionDays);
-      
+
       if (daysToAdd > 0) {
-        const currentTenant = await masterPrisma.tenant.findUnique({ where: { id } });
-        
+        const currentTenant = await getDb()
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, id))
+          .get();
+
         if (currentTenant) {
           let newEnd = new Date();
           // If current end date is in the future, add to it. Otherwise, start from now.
@@ -104,22 +114,24 @@ export async function PUT(request: NextRequest) {
             newEnd = new Date(currentTenant.subscriptionEnd);
           }
           newEnd.setDate(newEnd.getDate() + daysToAdd);
-          updateData.subscriptionEnd = newEnd;
+          updateData.subscriptionEnd = newEnd.toISOString();
           updateData.status = "ACTIVE"; // Automatically unfreeze on renewal
         }
       }
     }
 
-    const tenant = await masterPrisma.tenant.update({
-      where: { id },
-      data: updateData
-    });
+    const tenant = await getDb()
+      .update(tenants)
+      .set(updateData)
+      .where(eq(tenants.id, id))
+      .returning()
+      .get();
 
     return NextResponse.json(tenant);
   } catch (error: any) {
     console.error("Tenant Update Error:", error);
-    return NextResponse.json({ 
-      message: `Failed to update tenant. ${error.message || "Unknown error"}` 
+    return NextResponse.json({
+      message: `Failed to update tenant. ${error.message || "Unknown error"}`
     }, { status: 500 });
   }
 }
@@ -133,14 +145,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: "Missing tenant ID" }, { status: 400 });
     }
 
-    await masterPrisma.tenant.delete({
-      where: { id }
-    });
+    await getDb()
+      .delete(tenants)
+      .where(eq(tenants.id, id));
 
     return NextResponse.json({ success: true, message: "Tenant permanently removed." });
   } catch (error) {
     return NextResponse.json({ message: "Failed to permanently delete tenant" }, { status: 500 });
   }
 }
-
-

@@ -1,13 +1,17 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb } from "@/lib/db";
+import { masterAdmins } from "@/lib/db/schema";
 
 export async function POST(request: NextRequest) {
   try {
     const { password } = (await request.json()) as any;
 
     // Fetch dynamic password from DB
-    const adminConfig = await masterPrisma.masterAdmin.findFirst();
+    const adminConfig = await getDb()
+      .select()
+      .from(masterAdmins)
+      .get();
     const masterPassword = adminConfig?.password || process.env.SUPER_ADMIN_PASSWORD || "superadmin123";
 
     if (password !== masterPassword) {
@@ -19,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Set secure super session cookie
     response.cookies.set("super_session", masterPassword, {
       httpOnly: true,
-      secure: true, // Force secure on Vercel
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 // 24 hours
@@ -30,4 +34,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Login failed" }, { status: 500 });
   }
 }
-

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { leaveRecords, leaveBalances } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { createNotification } from "@/lib/notify";
 
 export async function POST(request: NextRequest) {
@@ -15,41 +17,43 @@ export async function POST(request: NextRequest) {
     const end = toDate ? new Date(toDate) : null;
     const year = start.getFullYear();
 
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Create Leave Record
-      await tx.leaveRecord.create({
-        data: {
-          employeeId,
-          date: start,
-          toDate: end,
-          amount: parseFloat(amount),
-          type: "DEDUCTION",
-          category: "MANUAL",
-          note,
-          year
-        }
-      });
+    // 1. Find Leave Balance
+    const balance = await db
+      .select()
+      .from(leaveBalances)
+      .where(and(eq(leaveBalances.employeeId, employeeId), eq(leaveBalances.year, year)))
+      .limit(1)
+      .get();
 
-      // 2. Update Leave Balance
-      const balance = await tx.leaveBalance.findUnique({
-        where: { employeeId_year: { employeeId, year } }
-      });
+    if (!balance) {
+      throw new Error(`No leave balance found for year ${year}. Please generate balances first.`);
+    }
 
-      if (balance) {
-        await tx.leaveBalance.update({
-          where: { id: balance.id },
-          data: {
-            dueLeave: {
-              decrement: parseFloat(amount)
-            }
-          }
-        });
-      } else {
-        throw new Error(`No leave balance found for year ${year}. Please generate balances first.`);
-      }
+    // 2. Create Leave Record
+    await db.insert(leaveRecords).values({
+      id: newId(),
+      employeeId,
+      date: start.toISOString(),
+      toDate: end ? end.toISOString() : null,
+      amount: parseFloat(amount),
+      type: "DEDUCTION",
+      category: "MANUAL",
+      note,
+      year,
+      createdAt: now(),
+      updatedAt: now()
     });
+
+    // 3. Update Leave Balance (decrement dueLeave)
+    await db
+      .update(leaveBalances)
+      .set({
+        dueLeave: sql`${leaveBalances.dueLeave} - ${parseFloat(amount)}`,
+        updatedAt: now()
+      })
+      .where(eq(leaveBalances.id, balance.id));
 
     // Notify Employee
     await createNotification({
@@ -65,4 +69,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error.message || "Failed to deduct leave" }, { status: 500 });
   }
 }
-

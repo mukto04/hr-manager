@@ -8,13 +8,12 @@
     "pages-build": "next build && npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "next lint",
-    "seed": "tsx prisma/seed.ts",
-    "setup": "npx prisma generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
-    "@prisma/adapter-d1": "^7.8.0",
-    "@prisma/client": "^6.19.2",
+    "drizzle-orm": "^0.44.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jose": "^6.2.2",
@@ -34,8 +33,8 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
+    "drizzle-kit": "^0.31.0",
     "postcss": "^8.4.49",
-    "prisma": "^6.0.1",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

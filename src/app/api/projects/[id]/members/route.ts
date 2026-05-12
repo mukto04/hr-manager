@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { projects, projectMembers, employees } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { createNotification } from "@/lib/notify";
 
 export async function POST(
@@ -10,42 +12,58 @@ export async function POST(
   try {
     const { id } = await params;
     const { employeeId, role } = (await request.json()) as any;
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     if (!employeeId) {
       return NextResponse.json({ message: "Employee ID is required" }, { status: 400 });
     }
 
-    const member = await prisma.projectMember.create({
-      data: {
+    const member = await db
+      .insert(projectMembers)
+      .values({
+        id: newId(),
         projectId: id,
         employeeId,
-        role: role || "Member"
-      },
-      include: {
-        employee: {
-          select: {
-            name: true,
-            designation: true
-          }
-        },
-        project: {
-          select: {
-            name: true
-          }
-        }
-      }
-    });
+        role: role || "Member",
+        assignedAt: now(),
+      })
+      .returning()
+      .get();
+
+    // Fetch employee and project info for notification and response
+    const employee = await db
+      .select({ name: employees.name, designation: employees.designation })
+      .from(employees)
+      .where(eq(employees.id, employeeId))
+      .get();
+
+    const project = await db
+      .select({ name: projects.name })
+      .from(projects)
+      .where(eq(projects.id, id))
+      .get();
 
     // Notify the member
     await createNotification({
       employeeId,
       title: "New Project Assigned",
-      message: `You have been assigned to project: ${member.project.name}`,
-      type: "PROJECT"
+      message: `You have been assigned to project: ${project?.name}`,
+      type: "PROJECT",
     });
 
-    return NextResponse.json(member, { status: 201 });
+    return NextResponse.json(
+      {
+        ...member,
+        employee: {
+          name: employee?.name,
+          designation: employee?.designation,
+        },
+        project: {
+          name: project?.name,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error("Failed to add member:", error);
     return NextResponse.json({ message: "Failed to add member", error: error.message }, { status: 500 });
@@ -60,20 +78,20 @@ export async function DELETE(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
     if (!employeeId) {
       return NextResponse.json({ message: "Employee ID is required" }, { status: 400 });
     }
 
-    await prisma.projectMember.delete({
-      where: {
-        projectId_employeeId: {
-          projectId: id,
-          employeeId
-        }
-      }
-    });
+    await db
+      .delete(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, id),
+          eq(projectMembers.employeeId, employeeId)
+        )
+      );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

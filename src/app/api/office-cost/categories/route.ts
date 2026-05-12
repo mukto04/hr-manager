@@ -1,18 +1,17 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { costCategories, costTransactions } from "@/lib/db/schema";
+import { eq, asc, count } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const prisma = await getTenantPrisma();
-    const categories = await prisma.costCategory.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        _count: {
-          select: { transactions: true }
-        }
-      }
-    });
+    const db = await getTenantDb();
+
+    const categories = await db
+      .select()
+      .from(costCategories)
+      .orderBy(asc(costCategories.name));
 
     // If no categories exist, seed with some defaults
     if (categories.length === 0) {
@@ -25,19 +24,55 @@ export async function GET() {
       ];
 
       for (const d of defaults) {
-        await prisma.costCategory.create({ data: d });
+        await db.insert(costCategories).values({
+          id: newId(),
+          name: d.name,
+          type: d.type,
+          color: d.color,
+          createdAt: now(),
+          updatedAt: now(),
+        });
       }
 
-      const freshCategories = await prisma.costCategory.findMany({
-        orderBy: { name: "asc" },
-        include: {
-          _count: { select: { transactions: true } }
-        }
-      });
-      return NextResponse.json(freshCategories);
+      const freshCategories = await db
+        .select()
+        .from(costCategories)
+        .orderBy(asc(costCategories.name));
+
+      // Add transaction counts
+      const withCounts = await Promise.all(
+        freshCategories.map(async (cat) => {
+          const txCount =
+            (
+              await db
+                .select({ count: count() })
+                .from(costTransactions)
+                .where(eq(costTransactions.categoryId, cat.id))
+                .get()
+            )?.count ?? 0;
+          return { ...cat, _count: { transactions: txCount } };
+        })
+      );
+
+      return NextResponse.json(withCounts);
     }
 
-    return NextResponse.json(categories);
+    // Add transaction counts to existing categories
+    const withCounts = await Promise.all(
+      categories.map(async (cat) => {
+        const txCount =
+          (
+            await db
+              .select({ count: count() })
+              .from(costTransactions)
+              .where(eq(costTransactions.categoryId, cat.id))
+              .get()
+          )?.count ?? 0;
+        return { ...cat, _count: { transactions: txCount } };
+      })
+    );
+
+    return NextResponse.json(withCounts);
   } catch (error: any) {
     console.error("Categories Fetch Error:", error);
     return NextResponse.json({ message: "Failed to fetch categories", error: error.message }, { status: 500 });
@@ -46,7 +81,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
     const body = (await request.json()) as any;
     const { name, type, color } = body;
 
@@ -54,24 +89,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Category name is required" }, { status: 400 });
     }
 
-    const category = await prisma.costCategory.create({
-      data: {
+    const category = await db
+      .insert(costCategories)
+      .values({
+        id: newId(),
         name,
         type: type || "EXPENSE",
-        color: color || "#64748b"
-      }
-    });
+        color: color || "#64748b",
+        createdAt: now(),
+        updatedAt: now(),
+      })
+      .returning()
+      .get();
 
     return NextResponse.json(category, { status: 201 });
   } catch (error: any) {
     console.error("Category Creation Error:", error);
-    return NextResponse.json({ message: "Failed to create category. Name might already exist.", error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { message: "Failed to create category. Name might already exist.", error: error.message },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -80,16 +123,26 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if it has transactions
-    const count = await prisma.costTransaction.count({ where: { categoryId: id } });
-    if (count > 0) {
-      return NextResponse.json({ message: "Cannot delete category with existing transactions." }, { status: 400 });
+    const txCount =
+      (
+        await db
+          .select({ count: count() })
+          .from(costTransactions)
+          .where(eq(costTransactions.categoryId, id))
+          .get()
+      )?.count ?? 0;
+
+    if (txCount > 0) {
+      return NextResponse.json(
+        { message: "Cannot delete category with existing transactions." },
+        { status: 400 }
+      );
     }
 
-    await prisma.costCategory.delete({ where: { id } });
+    await db.delete(costCategories).where(eq(costCategories.id, id));
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ message: "Failed to delete category", error: error.message }, { status: 500 });
   }
 }
-

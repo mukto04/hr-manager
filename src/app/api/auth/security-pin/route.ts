@@ -2,7 +2,9 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as jose from "jose";
-import { masterPrisma, getTenantPrisma } from "@/lib/prisma";
+import { getDb, getTenantDb, now } from "@/lib/db";
+import { tenants, employees } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const PIN_AUTH_COOKIE = "financial_auth_token";
 const SESSION_SECRET = process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877";
@@ -35,7 +37,7 @@ async function getAuthContext() {
 function setCookieOptions(response: NextResponse) {
   response.cookies.set(PIN_AUTH_COOKIE, "true", {
     httpOnly: true,
-    secure: IS_PROD, // false on localhost, true in production
+    secure: IS_PROD,
     sameSite: "lax",
     path: "/",
     maxAge: 3600 // 1 hour
@@ -53,17 +55,19 @@ export async function GET() {
   let hasPin = false;
   try {
     if (auth.type === "HR_ADMIN") {
-      const tenant = await masterPrisma.tenant.findUnique({
-        where: { slug: auth.payload.slug as string },
-        select: { securityPin: true }
-      });
+      const tenant = await getDb()
+        .select({ securityPin: tenants.securityPin })
+        .from(tenants)
+        .where(eq(tenants.slug, auth.payload.slug as string))
+        .get();
       hasPin = !!tenant?.securityPin;
     } else {
-      const prisma = await getTenantPrisma();
-      const employee = await prisma.employee.findUnique({
-        where: { id: auth.payload.employeeId as string },
-        select: { securityPin: true }
-      });
+      const db = await getTenantDb();
+      const employee = await db
+        .select({ securityPin: employees.securityPin })
+        .from(employees)
+        .where(eq(employees.id, auth.payload.employeeId as string))
+        .get();
       hasPin = !!employee?.securityPin;
     }
   } catch (err: any) {
@@ -71,9 +75,9 @@ export async function GET() {
     return NextResponse.json({ message: "Internal error" }, { status: 500 });
   }
 
-  return NextResponse.json({ 
+  return NextResponse.json({
     hasPin,
-    authorized: !!pinAuth 
+    authorized: !!pinAuth
   });
 }
 
@@ -83,32 +87,36 @@ export async function POST(request: NextRequest) {
 
   const { action, password, pin, newPin } = (await request.json()) as any;
 
-  // â”€â”€â”€ SETUP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // --- SETUP ---
   if (action === "setup") {
     try {
       if (auth.type === "HR_ADMIN") {
-        const tenant = await masterPrisma.tenant.findUnique({
-          where: { slug: auth.payload.slug as string }
-        });
+        const tenant = await getDb()
+          .select()
+          .from(tenants)
+          .where(eq(tenants.slug, auth.payload.slug as string))
+          .get();
         if (!tenant || tenant.adminPassword !== password) {
           return NextResponse.json({ message: "Invalid portal password" }, { status: 401 });
         }
-        await masterPrisma.tenant.update({
-          where: { slug: auth.payload.slug as string },
-          data: { securityPin: pin }
-        });
+        await getDb()
+          .update(tenants)
+          .set({ securityPin: pin })
+          .where(eq(tenants.slug, auth.payload.slug as string));
       } else {
-        const prisma = await getTenantPrisma();
-        const employee = await prisma.employee.findUnique({
-          where: { id: auth.payload.employeeId as string }
-        });
+        const db = await getTenantDb();
+        const employee = await db
+          .select()
+          .from(employees)
+          .where(eq(employees.id, auth.payload.employeeId as string))
+          .get();
         if (!employee || employee.password !== password) {
           return NextResponse.json({ message: "Invalid portal password" }, { status: 401 });
         }
-        await prisma.employee.update({
-          where: { id: employee.id },
-          data: { securityPin: pin }
-        });
+        await db
+          .update(employees)
+          .set({ securityPin: pin, updatedAt: now() })
+          .where(eq(employees.id, employee.id));
       }
     } catch (err: any) {
       console.error("[security-pin setup] Error:", err.message);
@@ -118,22 +126,24 @@ export async function POST(request: NextRequest) {
     return setCookieOptions(NextResponse.json({ message: "PIN setup successful" }));
   }
 
-  // â”€â”€â”€ VERIFY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // --- VERIFY ---
   if (action === "verify") {
     let isValid = false;
     try {
       if (auth.type === "HR_ADMIN") {
-        const tenant = await masterPrisma.tenant.findUnique({
-          where: { slug: auth.payload.slug as string },
-          select: { securityPin: true }
-        });
+        const tenant = await getDb()
+          .select({ securityPin: tenants.securityPin })
+          .from(tenants)
+          .where(eq(tenants.slug, auth.payload.slug as string))
+          .get();
         isValid = !!tenant?.securityPin && tenant.securityPin === pin;
       } else {
-        const prisma = await getTenantPrisma();
-        const employee = await prisma.employee.findUnique({
-          where: { id: auth.payload.employeeId as string },
-          select: { securityPin: true }
-        });
+        const db = await getTenantDb();
+        const employee = await db
+          .select({ securityPin: employees.securityPin })
+          .from(employees)
+          .where(eq(employees.id, auth.payload.employeeId as string))
+          .get();
         isValid = !!employee?.securityPin && employee.securityPin === pin;
       }
     } catch (err: any) {
@@ -148,32 +158,36 @@ export async function POST(request: NextRequest) {
     return setCookieOptions(NextResponse.json({ message: "Authorized" }));
   }
 
-  // â”€â”€â”€ RESET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // --- RESET ---
   if (action === "reset") {
     try {
       if (auth.type === "HR_ADMIN") {
-        const tenant = await masterPrisma.tenant.findUnique({
-          where: { slug: auth.payload.slug as string }
-        });
+        const tenant = await getDb()
+          .select()
+          .from(tenants)
+          .where(eq(tenants.slug, auth.payload.slug as string))
+          .get();
         if (!tenant || tenant.adminPassword !== password) {
           return NextResponse.json({ message: "Invalid portal password" }, { status: 401 });
         }
-        await masterPrisma.tenant.update({
-          where: { slug: auth.payload.slug as string },
-          data: { securityPin: newPin }
-        });
+        await getDb()
+          .update(tenants)
+          .set({ securityPin: newPin })
+          .where(eq(tenants.slug, auth.payload.slug as string));
       } else {
-        const prisma = await getTenantPrisma();
-        const employee = await prisma.employee.findUnique({
-          where: { id: auth.payload.employeeId as string }
-        });
+        const db = await getTenantDb();
+        const employee = await db
+          .select()
+          .from(employees)
+          .where(eq(employees.id, auth.payload.employeeId as string))
+          .get();
         if (!employee || employee.password !== password) {
           return NextResponse.json({ message: "Invalid portal password" }, { status: 401 });
         }
-        await prisma.employee.update({
-          where: { id: employee.id },
-          data: { securityPin: newPin }
-        });
+        await db
+          .update(employees)
+          .set({ securityPin: newPin, updatedAt: now() })
+          .where(eq(employees.id, employee.id));
       }
     } catch (err: any) {
       console.error("[security-pin reset] Error:", err.message);
@@ -185,4 +199,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ message: "Invalid action" }, { status: 400 });
 }
-

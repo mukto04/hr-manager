@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb } from "@/lib/db";
+import { holidays } from "@/lib/db/schema";
+import { and, gte, lte, asc } from "drizzle-orm";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
 
 export async function GET() {
@@ -10,21 +12,23 @@ export async function GET() {
   }
 
   try {
+    const db = await getTenantDb();
     const currentYear = new Date().getFullYear();
-    const holidays = await (await getTenantPrisma()).holiday.findMany({
-      where: {
-        date: {
-          gte: new Date(currentYear, 0, 1),
-          lte: new Date(currentYear, 11, 31)
-        }
-      },
-      orderBy: { date: "asc" }
-    });
 
-    return NextResponse.json(holidays);
+    const empHolidays = await db
+      .select()
+      .from(holidays)
+      .where(
+        and(
+          gte(holidays.date, new Date(currentYear, 0, 1).toISOString()),
+          lte(holidays.date, new Date(currentYear, 11, 31).toISOString())
+        )
+      )
+      .orderBy(asc(holidays.date));
+
+    return NextResponse.json(empHolidays);
   } catch (error) {
     console.error("Holidays API error:", error);
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
-

@@ -1,6 +1,8 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantPrisma } from "@/lib/prisma";
+import { getTenantDb, newId, now } from "@/lib/db";
+import { projects, projectWorkLogs, employees } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -10,22 +12,44 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const prisma = await getTenantPrisma();
-    const logs = await prisma.projectWorkLog.findMany({
-      where: { projectId: id },
-      include: {
-        employee: {
-          select: {
-            name: true,
-            image: true,
-            designation: true
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+    const db = await getTenantDb();
 
-    return NextResponse.json(logs);
+    const logs = await db
+      .select({
+        id: projectWorkLogs.id,
+        projectId: projectWorkLogs.projectId,
+        employeeId: projectWorkLogs.employeeId,
+        phase: projectWorkLogs.phase,
+        hours: projectWorkLogs.hours,
+        date: projectWorkLogs.date,
+        note: projectWorkLogs.note,
+        createdAt: projectWorkLogs.createdAt,
+        employeeName: employees.name,
+        employeeImage: employees.image,
+        employeeDesignation: employees.designation,
+      })
+      .from(projectWorkLogs)
+      .leftJoin(employees, eq(projectWorkLogs.employeeId, employees.id))
+      .where(eq(projectWorkLogs.projectId, id))
+      .orderBy(desc(projectWorkLogs.createdAt));
+
+    return NextResponse.json(
+      logs.map((l) => ({
+        id: l.id,
+        projectId: l.projectId,
+        employeeId: l.employeeId,
+        phase: l.phase,
+        hours: l.hours,
+        date: l.date,
+        note: l.note,
+        createdAt: l.createdAt,
+        employee: {
+          name: l.employeeName,
+          image: l.employeeImage,
+          designation: l.employeeDesignation,
+        },
+      }))
+    );
   } catch (error: any) {
     console.error("Failed to fetch work logs:", error);
     return NextResponse.json({ message: "Failed to fetch work logs", error: error.message }, { status: 500 });
@@ -39,27 +63,32 @@ export async function POST(
   try {
     const { id } = await params;
     const data = (await request.json()) as any;
-    const prisma = await getTenantPrisma();
+    const db = await getTenantDb();
 
-    const log = await prisma.projectWorkLog.create({
-      data: {
-        project: { connect: { id: id } },
-        employee: { connect: { id: data.employeeId } },
+    const log = await db
+      .insert(projectWorkLogs)
+      .values({
+        id: newId(),
+        projectId: id,
+        employeeId: data.employeeId,
         phase: data.phase,
         hours: parseFloat(data.hours),
         note: data.note || null,
-        date: data.date ? new Date(data.date) : new Date()
-      }
-    });
+        date: data.date ? data.date : now(),
+        createdAt: now(),
+      })
+      .returning()
+      .get();
 
     // Auto-transition project status based on phase
-    const project = await prisma.project.findUnique({
-      where: { id: id },
-      select: { status: true }
-    });
+    const project = await db
+      .select({ status: projects.status })
+      .from(projects)
+      .where(eq(projects.id, id))
+      .get();
 
     if (project) {
-      let newStatus = null;
+      let newStatus: string | null = null;
       if (data.phase === "RUNNING_WORK" && (project.status === "PLANNED" || project.status === "ASSIGNED")) {
         newStatus = "RUNNING";
       } else if (data.phase === "IN_TESTING" && project.status !== "IN_TESTING") {
@@ -69,10 +98,10 @@ export async function POST(
       }
 
       if (newStatus) {
-        await prisma.project.update({
-          where: { id: id },
-          data: { status: newStatus }
-        });
+        await db
+          .update(projects)
+          .set({ status: newStatus, updatedAt: now() })
+          .where(eq(projects.id, id));
       }
     }
 

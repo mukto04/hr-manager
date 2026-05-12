@@ -1,15 +1,20 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
-import { masterPrisma } from "@/lib/prisma";
+import { getDb, newId, now } from "@/lib/db";
+import { masterAdmins } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const adminConfig = await masterPrisma.masterAdmin.findFirst();
+    const adminConfig = await getDb()
+      .select()
+      .from(masterAdmins)
+      .get();
     return NextResponse.json({
       loginTitle: adminConfig?.loginTitle || "AppDevs HR Master Access",
       loginSub: adminConfig?.loginSub || "Restricted to AppDevs Administrators only.",
       country: adminConfig?.country || "Bangladesh",
-      currencySymbol: adminConfig?.currencySymbol || "à§³",
+      currencySymbol: adminConfig?.currencySymbol || "৳",
       timezone: adminConfig?.timezone || "Asia/Dhaka",
       language: adminConfig?.language || "en"
     });
@@ -22,34 +27,38 @@ export async function POST(request: NextRequest) {
   try {
     const { loginTitle, loginSub, country, currencySymbol, timezone, language } = (await request.json()) as any;
 
-    const adminConfig = await masterPrisma.masterAdmin.findFirst();
+    const adminConfig = await getDb()
+      .select()
+      .from(masterAdmins)
+      .get();
 
     if (adminConfig) {
-      await masterPrisma.masterAdmin.update({
-        where: { id: adminConfig.id },
-        data: { 
-          loginTitle: loginTitle || adminConfig.loginTitle, 
+      await getDb()
+        .update(masterAdmins)
+        .set({
+          loginTitle: loginTitle || adminConfig.loginTitle,
           loginSub: loginSub || adminConfig.loginSub,
           country: country || adminConfig.country,
           currencySymbol: currencySymbol || adminConfig.currencySymbol,
           timezone: timezone || adminConfig.timezone,
           language: language || adminConfig.language,
-          updatedAt: new Date() 
-        }
-      });
+          updatedAt: now()
+        })
+        .where(eq(masterAdmins.id, adminConfig.id));
     } else {
-      await masterPrisma.masterAdmin.create({
-        data: { 
+      await getDb()
+        .insert(masterAdmins)
+        .values({
+          id: newId(),
           password: "superadmin123",
           loginTitle: loginTitle || "AppDevs HR Master Access",
           loginSub: loginSub || "Restricted to AppDevs Administrators only.",
           country: country || "Bangladesh",
-          currencySymbol: currencySymbol || "à§³",
+          currencySymbol: currencySymbol || "৳",
           timezone: timezone || "Asia/Dhaka",
           language: language || "en",
-          updatedAt: new Date()
-        }
-      });
+          updatedAt: now()
+        });
     }
 
     return NextResponse.json({ message: "System settings updated successfully" });
@@ -58,4 +67,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error?.message || "Failed to update settings" }, { status: 500 });
   }
 }
-

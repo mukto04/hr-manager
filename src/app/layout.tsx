@@ -8,7 +8,9 @@ export const runtime = "edge";
 import { DialogProvider } from "@/components/ui/dialog-provider";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
-import { masterPrisma } from "@/lib/prisma";
+import { getDb } from "@/lib/db";
+import { landingPageContents } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const jakarta = Plus_Jakarta_Sans({ 
   subsets: ["latin"],
@@ -18,9 +20,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const branding = await masterPrisma.landingPageContent.findUnique({
-      where: { section: "BRANDING" }
-    });
+    const branding = await getDb().select().from(landingPageContents).where(eq(landingPageContents.section, "BRANDING")).get();
     
     const content = branding?.content as any || {};
     
