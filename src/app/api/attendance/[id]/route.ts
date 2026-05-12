@@ -3,13 +3,15 @@ import { getTenantPrisma } from "@/lib/prisma";
 import { calculateAttendanceStatus, syncLeaveBalanceForAttendance } from "@/lib/attendance-utils";
 import { createNotification } from "@/lib/notify";
 
+export const runtime = "edge";
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = (await request.json()) as any;
     const { checkIn, checkOut, status, isManual, note } = body;
 
     const checkInDate = checkIn ? new Date(checkIn) : null;
