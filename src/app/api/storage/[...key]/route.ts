@@ -12,7 +12,7 @@ export async function GET(
     const key = keyArray.join("/");
     // @ts-ignore
     const { env } = getRequestContext();
-    const storage = env.STORAGE;
+    const storage = (env as any).STORAGE;
 
     if (!storage) {
       return new NextResponse("Storage binding not found", { status: 500 });

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // @ts-ignore
     const { env } = getRequestContext();
-    const storage = env.STORAGE;
+    const storage = (env as any).STORAGE;
 
     if (!storage) {
       return NextResponse.json({ message: "Storage binding not found" }, { status: 500 });
