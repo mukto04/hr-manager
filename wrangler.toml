@@ -6,7 +6,7 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "hr-manager-db"
-database_id = "YOUR_D1_DATABASE_ID" # User will need to update this
+database_id = "8eb09181-24dc-470f-b732-496ccefd62ae"
 
 [[r2_buckets]]
 binding = "STORAGE"
