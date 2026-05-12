@@ -3,6 +3,7 @@ import { getPrismaBySlug } from "@/lib/prisma";
 import { calculateAttendanceStatus, syncLeaveBalanceForAttendance } from "@/lib/attendance-utils";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 
 export async function GET(
   request: NextRequest,

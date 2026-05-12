@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 import * as jose from "jose";
 
+export const runtime = "edge";
+
 const COOKIE_NAME = "hr_auth_token";
 const SESSION_SECRET = "appdevs-hr-portal-secure-vault-998877";
 
