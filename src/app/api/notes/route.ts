@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -99,3 +100,4 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: error.message || "Failed to delete note" }, { status: 500 });
   }
 }
+

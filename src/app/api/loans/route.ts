@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { loanSchema, toLoanPayload } from "@/app/api/_helpers";
@@ -57,3 +58,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to create loan", error }, { status: 400 });
   }
 }
+

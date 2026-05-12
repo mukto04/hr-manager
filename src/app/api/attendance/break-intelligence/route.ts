@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, format } from "date-fns";
@@ -87,3 +88,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Failed to create break record" }, { status: 500 });
   }
 }
+

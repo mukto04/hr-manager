@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -53,3 +54,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to fetch report data" }, { status: 500 });
   }
 }
+

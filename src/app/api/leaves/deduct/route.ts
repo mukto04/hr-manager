@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notify";
@@ -64,3 +65,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error.message || "Failed to deduct leave" }, { status: 500 });
   }
 }
+

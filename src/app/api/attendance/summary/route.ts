@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSaturday, isSunday, isSameDay } from "date-fns";
@@ -163,3 +164,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to generate report" }, { status: 500 });
   }
 }
+

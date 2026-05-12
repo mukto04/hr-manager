@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -49,3 +50,4 @@ export async function GET() {
     return NextResponse.json({ message: error.message || "Failed to fetch notices" }, { status: 500 });
   }
 }
+

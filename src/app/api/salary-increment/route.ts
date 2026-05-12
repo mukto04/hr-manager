@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateSalaryBreakdown } from "@/utils/calculations";
@@ -227,3 +228,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: "Failed to revert increment", error: error.message }, { status: 500 });
   }
 }
+

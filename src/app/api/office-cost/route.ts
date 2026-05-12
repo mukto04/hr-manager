@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { officeCostSchema } from "../_helpers";
@@ -103,3 +104,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to save office costs", error }, { status: 400 });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -14,16 +15,17 @@ export async function GET() {
 
     return NextResponse.json({
       country: config?.country || "Bangladesh",
-      currencySymbol: config?.currencySymbol || "৳",
+      currencySymbol: config?.currencySymbol || "à§³",
       timezone: config?.timezone || "Asia/Dhaka",
       language: config?.language || "en"
     });
   } catch (error) {
     return NextResponse.json({ 
       country: "Bangladesh",
-      currencySymbol: "৳",
+      currencySymbol: "à§³",
       timezone: "Asia/Dhaka",
       language: "en"
     });
   }
 }
+

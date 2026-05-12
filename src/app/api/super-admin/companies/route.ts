@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -141,4 +142,5 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: "Failed to permanently delete tenant" }, { status: 500 });
   }
 }
+
 

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaBySlug } from "@/lib/prisma";
 
@@ -32,3 +33,4 @@ export async function GET(
     return NextResponse.json({ message: "Connection failed" }, { status: 500 });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { salarySchema, toSalaryPayload } from "@/app/api/_helpers";
@@ -53,3 +54,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to create salary structure", error }, { status: 400 });
   }
 }
+

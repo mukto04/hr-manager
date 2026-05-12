@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -8,7 +9,7 @@ export async function GET() {
       loginTitle: adminConfig?.loginTitle || "AppDevs HR Master Access",
       loginSub: adminConfig?.loginSub || "Restricted to AppDevs Administrators only.",
       country: adminConfig?.country || "Bangladesh",
-      currencySymbol: adminConfig?.currencySymbol || "৳",
+      currencySymbol: adminConfig?.currencySymbol || "à§³",
       timezone: adminConfig?.timezone || "Asia/Dhaka",
       language: adminConfig?.language || "en"
     });
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
           loginTitle: loginTitle || "AppDevs HR Master Access",
           loginSub: loginSub || "Restricted to AppDevs Administrators only.",
           country: country || "Bangladesh",
-          currencySymbol: currencySymbol || "৳",
+          currencySymbol: currencySymbol || "à§³",
           timezone: timezone || "Asia/Dhaka",
           language: language || "en",
           updatedAt: new Date()
@@ -57,3 +58,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error?.message || "Failed to update settings" }, { status: 500 });
   }
 }
+

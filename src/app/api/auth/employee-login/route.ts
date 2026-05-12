@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 import { PrismaClient } from "@prisma/client";
@@ -73,3 +74,4 @@ export async function POST(request: NextRequest) {
     if (tenantClient) await tenantClient.$disconnect();
   }
 }
+

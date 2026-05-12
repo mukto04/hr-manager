@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateAttendanceStatus, syncLeaveBalanceForAttendance } from "@/lib/attendance-utils";
@@ -171,3 +172,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to save attendance" }, { status: 500 });
   }
 }
+

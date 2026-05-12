@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { calculateSalaryBreakdown } from "@/utils/calculations";
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
             data: { isPaid: true }
           });
 
-          // 2. Deduct loan installments → update loan paid/due amounts
+          // 2. Deduct loan installments â†’ update loan paid/due amounts
           if (ms.loanAdjustAmount > 0) {
             const loans = await tx.loan.findMany({
               where: { 
@@ -162,3 +163,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to close month", error: error instanceof Error ? error.message : error }, { status: 500 });
   }
 }
+

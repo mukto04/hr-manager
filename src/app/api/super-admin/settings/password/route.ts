@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -35,3 +36,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to update password", error: error.message }, { status: 500 });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -91,3 +92,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: "Failed to delete category", error: error.message }, { status: 500 });
   }
 }
+

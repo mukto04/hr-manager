@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { holidaySchema } from "@/app/api/_helpers";
@@ -26,3 +27,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to create holiday", error }, { status: 400 });
   }
 }
+

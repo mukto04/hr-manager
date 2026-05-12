@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { masterPrisma } from "@/lib/prisma";
 
@@ -47,3 +48,4 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+

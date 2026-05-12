@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { format } from "date-fns";
@@ -217,3 +218,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

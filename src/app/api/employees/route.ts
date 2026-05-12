@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma, masterPrisma, getTenantSlug } from "@/lib/prisma";
 import { employeeSchema } from "@/app/api/_helpers";
@@ -165,3 +166,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

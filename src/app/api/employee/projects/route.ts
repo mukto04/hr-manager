@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
@@ -50,3 +51,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Failed to fetch projects", error: error.message }, { status: 500 });
   }
 }
+

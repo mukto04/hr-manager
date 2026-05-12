@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { leaveSchema } from "@/app/api/_helpers";
@@ -47,3 +48,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to create leave balance", error }, { status: 400 });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { monthlySalarySchema, toMonthlySalaryPayload } from "@/app/api/_helpers";
@@ -182,3 +183,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Failed to create monthly salary", error }, { status: 400 });
   }
 }
+

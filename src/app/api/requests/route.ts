@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -85,7 +86,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ message: "id, type, and action are required" }, { status: 400 });
     }
 
-    // ─── LOAN ────────────────────────────────────────────────────────────────
+    // â”€â”€â”€ LOAN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (type === "loan") {
       const request = await (prisma as any).loanRequest.update({
         where: { id },
@@ -133,7 +134,7 @@ export async function PATCH(req: Request) {
       await prisma.notification.create({
         data: {
           employeeId: request.employeeId,
-          title: `Loan Request ${action === "APPROVED" ? "Approved ✅" : "Rejected ❌"}`,
+          title: `Loan Request ${action === "APPROVED" ? "Approved âœ…" : "Rejected âŒ"}`,
           message: action === "APPROVED"
             ? `Your loan request of ${request.requestedAmount} has been approved.`
             : `Your loan request was rejected. ${hrNote ? `Reason: ${hrNote}` : ""}`,
@@ -144,7 +145,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json(request);
     }
 
-    // ─── ADVANCE SALARY ───────────────────────────────────────────────────────
+    // â”€â”€â”€ ADVANCE SALARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (type === "advance") {
       const request = await (prisma as any).advanceSalaryRequest.update({
         where: { id },
@@ -189,7 +190,7 @@ export async function PATCH(req: Request) {
       await prisma.notification.create({
         data: {
           employeeId: request.employeeId,
-          title: `Advance Salary Request ${action === "APPROVED" ? "Approved ✅" : "Rejected ❌"}`,
+          title: `Advance Salary Request ${action === "APPROVED" ? "Approved âœ…" : "Rejected âŒ"}`,
           message: action === "APPROVED"
             ? `Your advance salary request of ${request.requestedAmount} has been approved.`
             : `Your advance salary request was rejected. ${hrNote ? `Reason: ${hrNote}` : ""}`,
@@ -200,9 +201,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json(request);
     }
 
-    // ─── LEAVE ────────────────────────────────────────────────────────────────
+    // â”€â”€â”€ LEAVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Leave approval only records the decision and notifies the employee.
-    // Leave balance deduction is NOT automatic — HR manages leave balance manually.
+    // Leave balance deduction is NOT automatic â€” HR manages leave balance manually.
     if (type === "leave") {
       const request = await (prisma as any).leaveRequest.update({
         where: { id },
@@ -213,7 +214,7 @@ export async function PATCH(req: Request) {
       await prisma.notification.create({
         data: {
           employeeId: request.employeeId,
-          title: `Leave Request ${action === "APPROVED" ? "Approved ✅" : "Rejected ❌"}`,
+          title: `Leave Request ${action === "APPROVED" ? "Approved âœ…" : "Rejected âŒ"}`,
           message: action === "APPROVED"
             ? `Your leave request for ${request.days} day(s) has been approved by HR.`
             : `Your leave request was rejected. ${hrNote ? `Reason: ${hrNote}` : ""}`,
@@ -229,3 +230,4 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
+

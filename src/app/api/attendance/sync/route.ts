@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -96,3 +97,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to sync attendance" }, { status: 500 });
   }
 }
+

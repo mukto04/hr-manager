@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -60,3 +61,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Internal Error" }, { status: 500 });
   }
 }
+

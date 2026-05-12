@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as jose from "jose";
@@ -51,3 +52,4 @@ export async function GET() {
     return NextResponse.json({ message: "Invalid session" }, { status: 401 });
   }
 }
+

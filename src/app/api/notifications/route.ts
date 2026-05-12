@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
@@ -181,3 +182,4 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: error.message || "Failed to update notification" }, { status: 500 });
   }
 }
+

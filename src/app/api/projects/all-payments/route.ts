@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -30,3 +31,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Failed to fetch all payments", error: error.message }, { status: 500 });
   }
 }
+

@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 
@@ -124,3 +125,4 @@ export async function PUT(request: NextRequest) {
     }, { status: 500 });
   }
 }
+

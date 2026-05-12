@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as jose from "jose";
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
 
   const { action, password, pin, newPin } = await request.json();
 
-  // ─── SETUP ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ SETUP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (action === "setup") {
     try {
       if (auth.type === "HR_ADMIN") {
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     return setCookieOptions(NextResponse.json({ message: "PIN setup successful" }));
   }
 
-  // ─── VERIFY ────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ VERIFY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (action === "verify") {
     let isValid = false;
     try {
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
     return setCookieOptions(NextResponse.json({ message: "Authorized" }));
   }
 
-  // ─── RESET ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ RESET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (action === "reset") {
     try {
       if (auth.type === "HR_ADMIN") {
@@ -184,3 +185,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ message: "Invalid action" }, { status: 400 });
 }
+

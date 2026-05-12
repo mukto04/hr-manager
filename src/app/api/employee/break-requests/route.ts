@@ -1,3 +1,4 @@
+﻿export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
 import { getEmployeeIdFromSession } from "@/lib/employee-auth";
@@ -59,3 +60,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error.message || "Internal Error" }, { status: 500 });
   }
 }
+
