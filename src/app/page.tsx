@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import { LandingPage } from "@/modules/landing/landing-page";
 import { masterPrisma } from "@/lib/prisma";
 
