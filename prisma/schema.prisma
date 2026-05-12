@@ -1,0 +1,546 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id              String            @id @default(cuid())
+  employeeCode    String            @unique
+  fingerprintId   String?           
+  name            String
+  designation     String
+  department      String?
+  email           String?           @unique
+  phone           String?
+  joiningDate     DateTime
+  dateOfBirth     DateTime
+  status          String            @default("ACTIVE")
+  bloodGroup      String?
+  guardianName    String?
+  guardianRelation String?
+  guardianPhone   String?
+  nidNumber       String?
+  educationStatus String?
+  password        String            @default("appdevs123456")
+  securityPin     String?           // Secondary PIN for financial data access
+  image           String?           
+  customData      Json?             // { fieldName: value }
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  leaveBalances   LeaveBalance[]
+  leaveRecords    LeaveRecord[]
+  loans           Loan[]
+  advances        AdvanceSalary[]
+  salaryStructure SalaryStructure?
+  monthlySalaries MonthlySalary[]
+  attendances     Attendance[]
+  attendanceRequests AttendanceRequest[]
+  breakRecords    BreakRecord[]
+  breakRequests   BreakRequest[]
+  notifications   Notification[]
+  loanRequests    LoanRequest[]
+  advanceRequests AdvanceSalaryRequest[]
+  leaveRequests   LeaveRequest[]
+  increments      SalaryIncrement[]
+  projects        ProjectMember[]
+  workLogs        ProjectWorkLog[]
+  managedProjects Project[]       @relation("ProjectManager")
+  
+  @@index([fingerprintId])
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  image     String?
+  file      String?
+  author    String   @default("HR Department")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  employeeId  String?
+  title       String
+  message     String
+  type        String   @default("NOTICE") // NOTICE, SYSTEM, etc.
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model Holiday {
+  id         String   @id @default(cuid())
+  name       String
+  date       DateTime
+  totalDays  Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model LeaveBalance {
+  id         String   @id @default(cuid())
+  employeeId String
+  year       Int
+  totalLeave Float    @default(0)
+  dueLeave   Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year])
+  @@index([employeeId])
+}
+
+model LeaveRecord {
+  id          String   @id @default(cuid())
+  employeeId  String
+  date        DateTime // For single day or start of range
+  toDate      DateTime? // Optional for range
+  amount      Float
+  type        String   @default("DEDUCTION") // DEDUCTION, REFUND
+  category    String   @default("MANUAL") // MANUAL, AUTOMATIC (Half-Day)
+  note        String?
+  year        Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, year])
+}
+
+model Loan {
+  id                String   @id @default(cuid())
+  employeeId        String
+  loanAmount        Float
+  paidAmount        Float
+  dueAmount         Float
+  installmentAmount Float    @default(0)
+  startMonth        Int?
+  startYear         Int?
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model AdvanceSalary {
+  id          String   @id @default(cuid())
+  employeeId  String
+  amount      Float
+  month       Int
+  year        Int
+  isDeducted  Boolean  @default(false)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model SalaryStructure {
+  id               String   @id @default(cuid())
+  employeeId       String   @unique
+  totalSalary      Float
+  basicSalary      Float
+  hra              Float
+  medicalAllowance Float
+  travelAllowance  Float
+  others           Float
+  festivalBonus    Float
+  breakdown        Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model MonthlySalary {
+  id                  String   @id @default(cuid())
+  employeeId          String
+  month               Int
+  year                Int
+  totalSalary         Float
+  workingDays         Float    @default(30)
+  workingDaySalary    Float
+  advanceSalaryAmount Float    @default(0)
+  loanAdjustAmount    Float    @default(0)
+  leaveDeductionAmount Float   @default(0)
+  payableSalary       Float    @default(0)
+  basicSalary         Float
+  hra                 Float
+  medicalAllowance    Float
+  travelAllowance     Float
+  others              Float
+  festivalBonus       Float
+  totalSalaryPaid     Float
+  isPaid              Boolean  @default(false)
+  isHeld              Boolean  @default(false)
+  breakdown           Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  employee            Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+}
+
+model OfficeCost {
+  id              String   @id @default(cuid())
+  date            DateTime
+  month           Int
+  year            Int
+  day             Int
+  payAmount       Float    @default(0)
+  bazarCost       Float    @default(0)
+  details         String?
+  extraCost       Float    @default(0)
+  extraDetail     String?
+  deposit         Float    @default(0)
+  recurringCost   Float    @default(0)
+  recurringDetail String?
+  capitalCost     Float    @default(0)
+  capitalDetail   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([date])
+  @@unique([month, year, day])
+}
+
+model CostCategory {
+  id           String            @id @default(cuid())
+  name         String
+  type         String            @default("EXPENSE") // INCOME, EXPENSE
+  color        String?           @default("#64748b")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  transactions CostTransaction[]
+
+  @@unique([name])
+}
+
+model CostTransaction {
+  id          String       @id @default(cuid())
+  date        DateTime     @default(now())
+  month       Int
+  year        Int
+  amount      Float
+  type        String       @default("EXPENSE") // INCOME, EXPENSE
+  categoryId  String
+  category    CostCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  details     String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([month, year])
+  @@index([categoryId])
+}
+
+model Attendance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  status      String   @default("PRESENT")
+  isManual    Boolean  @default(false)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
+model BreakRecord {
+  id          String   @id @default(cuid())
+  employeeId  String
+  attendanceId String? // Optional link to daily attendance
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int      @default(0) // in minutes
+  note        String?
+  status      String?  @default("COMPLETED")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+  @@index([attendanceId])
+}
+
+model BreakRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime
+  reason      String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  hrNote      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model AttendanceRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  reason      String
+  attachment  String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  hrNote      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model Tenant {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  companyName    String
+  dbUrl          String
+  planName       String?   @default("Starter")
+  permissions    Json?
+  employeeLimit  Int       @default(50)
+  status         String    @default("ACTIVE") // ACTIVE, FROZEN
+  adminUsername  String
+  adminPassword  String
+  securityPin    String?   // Secondary PIN for financial data access
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  createdAt      DateTime  @default(now())
+}
+
+model AttendanceDevice {
+  id          String   @id @default(cuid())
+  deviceName  String
+  serialNumber String?  @unique
+  ipAddress   String?
+  port        Int      @default(4370)
+  status      String   @default("DISCONNECTED") // ACTIVE, DISCONNECTED
+  lastSync    DateTime?
+  lastSeen    DateTime?
+  description String?
+  apiKey      String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TenantSettings {
+  id                String   @id @default(cuid())
+  defaultInTime     String   @default("09:00 AM")
+  defaultOutTime    String   @default("06:00 PM")
+  lateThresholdTime String   @default("09:15 AM")
+  avgRequestTime    String   @default("09:00 AM")
+  googleSheetUrl    String?
+  halfDayThreshold  Int      @default(420) // in minutes
+  fullDayThreshold  Int      @default(540) // in minutes (9 hours)
+  weeklySchedule    Json?    // Array of objects { day: string, enabled: boolean, inTime: string, outTime: string }
+  salaryStructure   Json?    // { basic: 50, hra: 25, ma: 12.5, ta: 5, others: 7.5 }
+  employeeFieldsConfig Json? // { visible: string[], mandatory: string[] }
+  customFields      Json?    // Array of { id: string, label: string, type: string }
+  autoLeaveDeduction Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model LandingPageContent {
+  id        String   @id @default(cuid())
+  section   String   @unique
+  content   Json
+  updatedAt DateTime @updatedAt
+}
+
+model MasterAdmin {
+  id              String   @id @default(cuid())
+  password        String   @default("superadmin123")
+  loginTitle      String?  @default("AppDevs HR Master Access")
+  loginSub        String?  @default("Restricted to AppDevs Administrators only.")
+  country         String?  @default("Bangladesh")
+  currencySymbol  String?  @default("৳")
+  timezone        String?  @default("Asia/Dhaka")
+  language        String?  @default("en")
+  updatedAt       DateTime @updatedAt
+}
+
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String?
+  content   String
+  isPinned  Boolean  @default(false)
+  color     String?  @default("white")
+  order     Int      @default(0)
+  reminderAt DateTime?
+  isReminderNotified Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LoanRequest {
+  id               String   @id @default(cuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requestedAmount  Float
+  installmentAmount Float?   @default(0)
+  startMonth       Int?
+  startYear        Int?
+  reason           String
+  status           String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  hrNote           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model AdvanceSalaryRequest {
+  id               String   @id @default(cuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requestedAmount  Float
+  month            Int
+  year             Int
+  reason           String
+  status           String   @default("PENDING")
+  hrNote           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model LeaveRequest {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  fromDate   DateTime
+  toDate     DateTime
+  days       Float
+  reason     String
+  status     String   @default("PENDING")
+  hrNote     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+model AdmsLog {
+  id        String   @id @default(cuid())
+  sn        String?
+  table     String?
+  path      String?
+  body      String?
+  method    String?
+  createdAt DateTime @default(now())
+}
+
+model SalaryIncrement {
+  id              String   @id @default(cuid())
+  employeeId      String
+  amount          Float    // The increment amount added
+  percentage      Float?   // Optional: the percentage used
+  type            String   // FIXED_AMOUNT, PERCENT_TOTAL, PERCENT_BASIC
+  oldSalary       Float    // Salary before increment
+  newSalary       Float    // Salary after increment
+  effectiveMonth  Int
+  effectiveYear   Int
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model Project {
+  id              String          @id @default(cuid())
+  name            String
+  type            String?         // e.g. Web, App, Marketing
+  startDate       DateTime?
+  endDate         DateTime?
+  totalAmount     Float           @default(0)
+  status          String          @default("PLANNED") // PLANNED, RUNNING, ON_HOLD, etc.
+  description     String?
+  clientSource    String?         // e.g. LinkedIn, Upwork
+  projectManagerId String?
+  projectManager   Employee?      @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  members         ProjectMember[]
+  payments        ProjectPayment[]
+  workLogs        ProjectWorkLog[]
+}
+
+model ProjectMember {
+  id          String   @id @default(cuid())
+  projectId   String
+  employeeId  String
+  role        String   @default("Member") // Lead, Member, etc.
+  assignedAt  DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, employeeId])
+  @@index([projectId])
+  @@index([employeeId])
+}
+
+model ProjectPayment {
+  id          String   @id @default(cuid())
+  projectId   String
+  amount      Float
+  date        DateTime @default(now())
+  method      String   @default("Bank") // Bank, Cash, etc.
+  reference   String?  // Cheque No, Transaction ID
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectWorkLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  employeeId  String
+  phase       String   // RUNNING_WORK, IN_TESTING, ISSUE_FIXING, HANDOVER, CC, COMPLETE
+  hours       Float
+  date        DateTime @default(now())
+  note        String?
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([employeeId])
+}

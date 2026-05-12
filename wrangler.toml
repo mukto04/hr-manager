@@ -1,0 +1,12 @@
+name = "hr-manager"
+compatibility_date = "2024-05-12"
+pages_build_output_dir = ".vercel/output"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hr-manager-db"
+database_id = "YOUR_D1_DATABASE_ID" # User will need to update this
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "hr-manager-storage"

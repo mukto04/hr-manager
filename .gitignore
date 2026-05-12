@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+coverage
+*.log
+.vercel
+
+*.db
+*.zip
+*.tar.gz
+check_loans_direct.ts

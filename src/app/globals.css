@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scrollbar-gutter: stable; /* Permanent fix for layout shifting when modals open */
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+input, select, textarea {
+  @apply outline-none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+@keyframes progress-bar {
+  0% { width: 0%; transform: translateX(-100%); }
+  50% { width: 70%; transform: translateX(0); }
+  100% { width: 100%; transform: translateX(0); }
+}
+
+.animate-progress-bar {
+  animation: progress-bar 10s cubic-bezier(0.1, 0.5, 0.5, 1) infinite;
+}
+
+/* Rich Text / Notepad Styles */
+.prose ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+.prose ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+.prose li {
+  display: list-item !important;
+  margin-bottom: 0.25rem !important;
+}
+.prose b, .prose strong {
+  font-weight: 800 !important;
+}
+.prose font {
+  /* Ensure font colors from execCommand are respected */
+}
+
+[contenteditable]:empty:before {
+  content: attr(placeholder);
+  pointer-events: none;
+  display: block;
+}

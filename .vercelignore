@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+*.tar.gz
+*.zip
+*.db
+tmp
+public/*.tar.gz
+public/*.zip
