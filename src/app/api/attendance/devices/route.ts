@@ -1,7 +1,6 @@
-﻿export const runtime = "edge";
+export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantPrisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,7 +43,7 @@ export async function POST(request: NextRequest) {
         ipAddress: data.ipAddress || null,
         port: parseInt(data.port) || 4370,
         description: data.description,
-        apiKey: randomUUID(),
+        apiKey: crypto.randomUUID(),
         status: "PENDING"
       }
     });
