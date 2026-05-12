@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 import * as schema from "./schema";
 import { tenants } from "./schema";
 
@@ -34,7 +34,7 @@ export async function getTenantSlug(): Promise<string> {
 
   const secretStr = process.env.SESSION_SECRET || "fallback-secret";
   const secret = new TextEncoder().encode(secretStr);
-  const { payload } = await jose.jwtVerify(token, secret);
+  const { payload } = await jwtVerify(token, secret);
 
   return (payload.slug || payload.companyCode) as string;
 }

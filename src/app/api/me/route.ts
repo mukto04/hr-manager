@@ -1,7 +1,7 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 import { getDb } from "@/lib/db";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -18,7 +18,7 @@ export async function GET() {
     const secret = new TextEncoder().encode(
       process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877"
     );
-    const { payload } = await jose.jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret);
     const slug = (payload.slug || payload.companyCode) as string;
 
     // --- Live permissions fetch from Master DB ---

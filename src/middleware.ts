@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 
 const HR_COOKIE = "hr_auth_token";
 const PUBLIC_PATHS = [
@@ -127,7 +127,7 @@ export async function middleware(request: NextRequest) {
     
     try {
       const secret = new TextEncoder().encode(process.env.SESSION_SECRET || "fallback-secret");
-      await jose.jwtVerify(empToken, secret);
+      await jwtVerify(empToken, secret);
       return NextResponse.next();
     } catch (err) {
       // Token expired or invalid

@@ -4,7 +4,7 @@ import { getDb, now } from "@/lib/db";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
       process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877"
     );
 
-    const { payload } = await jose.jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret);
     const slug = payload.slug as string;
 
     if (!slug) {

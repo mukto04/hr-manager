@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 
 export async function getEmployeeSession() {
   const cookieStore = await cookies();
@@ -8,7 +8,7 @@ export async function getEmployeeSession() {
 
   try {
     const secret = new TextEncoder().encode(process.env.SESSION_SECRET || "fallback-secret");
-    const { payload } = await jose.jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret);
     return payload;
   } catch (error) {
     return null;

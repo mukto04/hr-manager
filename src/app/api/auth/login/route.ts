@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import * as jose from "jose";
+import { SignJWT } from "jose";
 
 const COOKIE_NAME = "hr_auth_token";
 const SESSION_SECRET = "appdevs-hr-portal-secure-vault-998877";
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Generating token for ${tenant.companyName} (${tenant.slug})`);
 
-    const token = await new jose.SignJWT({
+    const token = await new SignJWT({
       slug: tenant.slug,
       companyName: tenant.companyName,
       role: "HR_ADMIN",

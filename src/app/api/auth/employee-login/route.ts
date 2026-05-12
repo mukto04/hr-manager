@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, getDbBySlug } from "@/lib/db";
 import { tenants, employees } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import * as jose from "jose";
+import { SignJWT } from "jose";
 
 const COOKIE_NAME = "employee_session";
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // 3. Create Session JWT (aligned with Multi-Tenant Routing)
     const secret = new TextEncoder().encode(process.env.SESSION_SECRET || "fallback-secret");
 
-    const token = await new jose.SignJWT({
+    const token = await new SignJWT({
       employeeId: employee.id,
       slug: tenant.slug,
       companyName: tenant.companyName,

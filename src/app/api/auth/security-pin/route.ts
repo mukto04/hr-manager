@@ -1,7 +1,7 @@
 export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import * as jose from "jose";
+import { jwtVerify } from "jose";
 import { getDb, getTenantDb, now } from "@/lib/db";
 import { tenants, employees } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -19,14 +19,14 @@ async function getAuthContext() {
 
   if (hrToken) {
     try {
-      const { payload } = await jose.jwtVerify(hrToken, secret);
+      const { payload } = await jwtVerify(hrToken, secret);
       return { type: "HR_ADMIN", payload };
     } catch (e) {}
   }
 
   if (empToken) {
     try {
-      const { payload } = await jose.jwtVerify(empToken, secret);
+      const { payload } = await jwtVerify(empToken, secret);
       return { type: "EMPLOYEE", payload };
     } catch (e) {}
   }

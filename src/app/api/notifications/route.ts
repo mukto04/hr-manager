@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     let subscription = null;
     try {
       const { cookies: getCookies } = await import("next/headers");
-      const jose = await import("jose");
+      const { jwtVerify } = await import("jose");
 
       const cStore = await getCookies();
       const token = cStore.get("hr_auth_token")?.value;
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
         const secret = new TextEncoder().encode(
           process.env.SESSION_SECRET || "appdevs-hr-portal-secure-vault-998877"
         );
-        const { payload } = await jose.jwtVerify(token, secret);
+        const { payload } = await jwtVerify(token, secret);
         const slug = payload.slug as string;
 
         if (slug) {
