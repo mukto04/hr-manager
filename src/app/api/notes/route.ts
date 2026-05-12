@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const prisma = await getTenantPrisma();
-    const body = await req.json();
+    const body = (await req.json()) as any;
     
     // Get highest order to append to end
     const lastNote = await prisma.note.findFirst({
@@ -51,7 +51,7 @@ export async function PUT(req: Request) {
     const prisma = await getTenantPrisma();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const body = await req.json();
+    const body = (await req.json()) as any;
 
     if (id) {
       // Update specific note

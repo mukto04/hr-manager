@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     if (!employeeId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const prisma = await getTenantPrisma();
-    const body = await req.json();
+    const body = (await req.json()) as any;
     const { type, ...data } = body;
 
     // Fetch employee salary structure and active loans for validation

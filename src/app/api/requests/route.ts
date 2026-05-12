@@ -79,7 +79,7 @@ export async function PATCH(req: Request) {
     const prisma = await getTenantPrisma();
     const url = new URL(req.url);
     const type = url.searchParams.get("type"); // loan | advance | leave
-    const body = await req.json();
+    const body = (await req.json()) as any;
     const { id, action, hrNote } = body; // action: APPROVED | REJECTED
 
     if (!id || !action || !type) {

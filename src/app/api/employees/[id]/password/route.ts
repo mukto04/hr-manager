@@ -5,7 +5,7 @@ import { getTenantPrisma } from "@/lib/prisma";
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const body = await req.json();
+    const body = (await req.json()) as any;
 
     if (!body.password || body.password.length < 6) {
       return NextResponse.json(
