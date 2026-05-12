@@ -1,14 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getRequestContext } from "@cloudflare/next-on-pages";
 
 export const runtime = "edge";
 
 export async function GET(
-  request: Request,
-  { params }: { params: { key: string[] } }
+  request: NextRequest,
+  { params }: { params: Promise<{ key: string[] }> }
 ) {
   try {
-    const key = (await params).key.join("/");
+    const { key: keyArray } = await params;
+    const key = keyArray.join("/");
     // @ts-ignore
     const { env } = getRequestContext();
     const storage = env.STORAGE;
