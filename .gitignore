@@ -4,6 +4,7 @@ dist
 coverage
 *.log
 .vercel
+.open-next
 
 *.db
 *.zip
